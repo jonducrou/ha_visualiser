@@ -61,6 +61,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     )
     
     _LOGGER.info("Home Assistant Entity Visualizer integration loaded successfully")
+    _LOGGER.debug("Integration setup completed - panel and websocket handlers registered")
     return True
 
 
@@ -98,7 +99,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             require_admin=False,
         )
     
-    _LOGGER.info("Home Assistant Entity Visualizer integration loaded")
+    _LOGGER.info("Home Assistant Entity Visualizer integration loaded via config entry")
+    _LOGGER.debug("Config entry setup completed - services available")
     return True
 
 

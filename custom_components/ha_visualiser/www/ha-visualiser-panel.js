@@ -17,6 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
 
   connectedCallback() {
+    console.log('HA Visualiser Panel: Connected callback started');
     this.innerHTML = `
       <style>
         .container {
@@ -181,16 +182,19 @@ class HaVisualiserPanel extends HTMLElement {
   }
 
   async searchEntities(query) {
+    console.log('HA Visualiser: Searching for entities with query:', query);
     try {
+      console.log('HA Visualiser: Calling WebSocket API...');
       const results = await this.hass.callWS({
         type: 'ha_visualiser/search_entities',
         query: query,
         limit: 10
       });
       
+      console.log('HA Visualiser: Search successful, results:', results);
       this.displaySearchResults(results);
     } catch (error) {
-      console.error('Search failed:', error);
+      console.error('HA Visualiser: Search failed, using fallback:', error);
       // For now, fall back to simple client-side search
       this.fallbackSearch(query);
     }

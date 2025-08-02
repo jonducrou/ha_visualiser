@@ -1,6 +1,6 @@
 {
   "domain": "ha_visualiser",
-  "name": "Home Assistant Entity Visualizer",
+  "name": "Entity Visualizer",
   "codeowners": ["@jonducrou"],
   "config_flow": true,
   "dependencies": [],

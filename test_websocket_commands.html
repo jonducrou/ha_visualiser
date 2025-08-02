@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HA Visualiser WebSocket Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .result { background: #f5f5f5; padding: 10px; margin: 10px 0; }
+        button { padding: 10px 15px; margin: 5px; }
+        input, textarea { margin: 5px; padding: 5px; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>HA Visualiser WebSocket API Test</h1>
+    
+    <div class="test-section">
+        <h3>Instructions:</h3>
+        <ol>
+            <li>Open this page in your Home Assistant instance (copy to www/ folder)</li>
+            <li>Open browser developer tools (F12)</li>
+            <li>Copy and paste these commands into the console</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h3>Test Commands (Copy to Browser Console):</h3>
+        
+        <h4>1. Test Search Entities:</h4>
+        <textarea rows="3" cols="80" readonly>
+hass.connection.sendMessage({type: 'ha_visualiser/search_entities', query: 'light', limit: 5}).then(result => console.log('Search result:', result));
+        </textarea>
+        
+        <h4>2. Test Get Neighborhood:</h4>
+        <textarea rows="3" cols="80" readonly>
+hass.connection.sendMessage({type: 'ha_visualiser/get_neighborhood', entity_id: 'light.living_room', max_depth: 1}).then(result => console.log('Neighborhood result:', result));
+        </textarea>
+        
+        <h4>3. Test Graph Statistics:</h4>
+        <textarea rows="3" cols="80" readonly>
+hass.connection.sendMessage({type: 'ha_visualiser/get_graph_statistics'}).then(result => console.log('Statistics result:', result));
+        </textarea>
+        
+        <h4>4. Test Filtered Neighborhood:</h4>
+        <textarea rows="4" cols="80" readonly>
+hass.connection.sendMessage({
+  type: 'ha_visualiser/get_filtered_neighborhood', 
+  entity_id: 'light.living_room', 
+  domain_filter: ['light', 'switch']
+}).then(result => console.log('Filtered result:', result));
+        </textarea>
+    </div>
+
+    <div class="test-section">
+        <h3>Expected Results:</h3>
+        <ul>
+            <li><strong>Search:</strong> Should return array of entities matching query</li>
+            <li><strong>Neighborhood:</strong> Should return nodes and edges for entity relationships</li>
+            <li><strong>Statistics:</strong> Should return counts by domain, area, device</li>
+            <li><strong>Filtered:</strong> Should return filtered neighborhood graph</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>Common Errors and Solutions:</h3>
+        <ul>
+            <li><strong>"Unknown command":</strong> Integration not loaded or websocket handlers not registered</li>
+            <li><strong>"Service not found":</strong> Graph service not initialized in hass.data</li>
+            <li><strong>"Entity not found":</strong> Replace entity_id with valid entity from your HA</li>
+            <li><strong>Connection errors:</strong> Check HA logs for Python errors</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>Debug Steps:</h3>
+        <ol>
+            <li>Check HA logs: <code>grep 'ha_visualiser' home-assistant.log</code></li>
+            <li>Verify integration loaded: Look for "Entity Visualizer integration loaded successfully"</li>
+            <li>Check websocket registration: Look for "Successfully registered 4 websocket commands"</li>
+            <li>Test entity existence: <code>hass.states['light.living_room']</code></li>
+            <li>Check available commands: <code>Object.keys(hass.connection._commands)</code></li>
+        </ol>
+    </div>
+
+    <script>
+        // Simple UI helpers
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text);
+        }
+        
+        // Add copy buttons to textareas
+        document.querySelectorAll('textarea').forEach(textarea => {
+            const button = document.createElement('button');
+            button.textContent = 'Copy';
+            button.onclick = () => copyToClipboard(textarea.value);
+            textarea.parentNode.insertBefore(button, textarea.nextSibling);
+        });
+    </script>
+</body>
+</html>
