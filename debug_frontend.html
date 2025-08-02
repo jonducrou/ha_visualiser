@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend Debug - HA Visualiser</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .result { background: #f5f5f5; padding: 10px; margin: 10px 0; white-space: pre-wrap; }
+        button { padding: 10px 15px; margin: 5px; }
+        .error { color: red; }
+        .success { color: green; }
+        .warning { color: orange; }
+    </style>
+</head>
+<body>
+    <h1>HA Visualiser Frontend Debug</h1>
+    
+    <div class="debug-section">
+        <h3>Frontend Update Issues Troubleshooting</h3>
+        
+        <h4>Common Causes:</h4>
+        <ol>
+            <li><strong>Browser Cache:</strong> Old JavaScript file cached</li>
+            <li><strong>File Copy Issues:</strong> Updated file not copied to HA</li>
+            <li><strong>HA Static File Caching:</strong> HA serving old version</li>
+            <li><strong>Panel Registration:</strong> Panel not re-registered with new JS</li>
+            <li><strong>JavaScript Errors:</strong> New code has syntax errors</li>
+        </ol>
+    </div>
+
+    <div class="debug-section">
+        <h3>Step-by-Step Debugging:</h3>
+        
+        <h4>1. Check File Timestamps</h4>
+        <p>Verify the file was actually updated in HA:</p>
+        <div class="result">
+# Check when the file was last modified
+ls -la /path/to/homeassistant/config/custom_components/ha_visualiser/www/ha-visualiser-panel.js
+
+# Should show recent timestamp matching your update
+        </div>
+        
+        <h4>2. Clear Browser Cache</h4>
+        <p>Force refresh to bypass browser cache:</p>
+        <div class="result">
+1. Open HA Entity Visualizer panel
+2. Press F12 to open Developer Tools
+3. Right-click refresh button → "Empty Cache and Hard Reload"
+4. Or press Ctrl+F5 (Windows) or Cmd+Shift+R (Mac)
+        </div>
+        
+        <h4>3. Check JavaScript Console</h4>
+        <p>Look for loading errors:</p>
+        <div class="result">
+1. Open Developer Tools (F12)
+2. Go to Console tab
+3. Look for errors like:
+   - "HA Visualiser Panel: Connected callback started"
+   - "vis.js not loaded" 
+   - JavaScript syntax errors
+   - Network errors loading vis.js CDN
+        </div>
+        
+        <h4>4. Verify Panel Registration</h4>
+        <p>Check if panel is using new JavaScript:</p>
+        <div class="result">
+1. In Console, type: document.querySelector('ha-visualiser-panel')
+2. Should return the custom element
+3. Check if it has the new methods by typing:
+   document.querySelector('ha-visualiser-panel').loadVisJS
+4. Should return a function if new code is loaded
+        </div>
+        
+        <h4>5. Manual File Version Check</h4>
+        <p>Verify file contents in browser:</p>
+        <div class="result">
+1. Navigate to: http://your-ha-url:8123/hacsfiles/ha_visualiser/ha-visualiser-panel.js
+2. Search for "loadVisJS" in the file
+3. Should find the new vis.js loading code
+4. If not found, file wasn't updated properly
+        </div>
+    </div>
+
+    <div class="debug-section">
+        <h3>Quick Fixes:</h3>
+        
+        <h4>Force File Update:</h4>
+        <div class="result">
+# Copy file again with force
+cp -f custom_components/ha_visualiser/www/ha-visualiser-panel.js /path/to/homeassistant/config/custom_components/ha_visualiser/www/
+
+# Restart HA
+sudo systemctl restart home-assistant
+        </div>
+        
+        <h4>Add Cache Busting:</h4>
+        <p>If HA is caching aggressively, we can add a version parameter:</p>
+        <div class="result">
+# In manifest.json, update version number
+{
+  "version": "0.1.1"
+}
+
+# Or add timestamp to file registration
+        </div>
+        
+        <h4>Test vis.js Loading Directly:</h4>
+        <div class="result">
+# In browser console, test if vis.js can load:
+const script = document.createElement('script');
+script.src = 'https://unpkg.com/vis-network@latest/dist/vis-network.min.js';
+script.onload = () => console.log('vis.js loaded:', !!window.vis);
+script.onerror = (e) => console.error('vis.js failed to load:', e);
+document.head.appendChild(script);
+        </div>
+    </div>
+
+    <div class="debug-section">
+        <h3>Expected Behavior After Fix:</h3>
+        <ul>
+            <li>Console shows: "HA Visualiser Panel: Connected callback started"</li>
+            <li>Graph container has vis.js network with controls</li>
+            <li>Searching entity shows interactive graph instead of text list</li>
+            <li>Nodes are colored/shaped by domain type</li>
+            <li>Click navigation works between entities</li>
+        </ul>
+    </div>
+
+    <script>
+        // Auto-check if this page is loaded in HA context
+        if (window.location.hostname !== 'localhost' && window.hass) {
+            document.body.insertAdjacentHTML('afterbegin', 
+                '<div class="warning">⚠️ Running in HA context - check console for integration status</div>'
+            );
+        }
+    </script>
+</body>
+</html>
