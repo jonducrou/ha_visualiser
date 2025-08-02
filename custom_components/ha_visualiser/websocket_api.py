@@ -1,0 +1,112 @@
+"""Websocket API for Home Assistant Entity Visualizer."""
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+import voluptuous as vol
+
+from homeassistant.components import websocket_api
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.typing import ConfigType
+
+from .const import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
+
+
+@callback
+def async_register_websocket_handlers(hass: HomeAssistant) -> None:
+    """Register websocket API handlers."""
+    websocket_api.async_register_command(hass, websocket_search_entities)
+    websocket_api.async_register_command(hass, websocket_get_neighborhood)
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): "ha_visualiser/search_entities",
+    vol.Required("query"): str,
+    vol.Optional("limit", default=20): int,
+})
+@websocket_api.async_response
+async def websocket_search_entities(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Search for entities matching the query."""
+    try:
+        graph_service = hass.data[DOMAIN]["graph_service"]
+        results = await graph_service.search_entities(
+            msg["query"], 
+            msg["limit"]
+        )
+        
+        connection.send_result(msg["id"], results)
+    except Exception as error:
+        _LOGGER.error("Error searching entities: %s", error)
+        connection.send_error(
+            msg["id"], 
+            websocket_api.const.ERR_UNKNOWN_ERROR, 
+            str(error)
+        )
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): "ha_visualiser/get_neighborhood",
+    vol.Required("entity_id"): str,
+    vol.Optional("max_depth", default=1): int,
+})
+@websocket_api.async_response
+async def websocket_get_neighborhood(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Get the neighborhood graph for an entity."""
+    try:
+        graph_service = hass.data[DOMAIN]["graph_service"]
+        result = await graph_service.get_entity_neighborhood(
+            msg["entity_id"],
+            msg["max_depth"]
+        )
+        
+        # Convert dataclasses to dicts for JSON serialization
+        serialized_result = {
+            "nodes": [
+                {
+                    "id": node.id,
+                    "label": node.label,
+                    "domain": node.domain,
+                    "area": node.area,
+                    "device_id": node.device_id,
+                    "state": node.state
+                }
+                for node in result["nodes"]
+            ],
+            "edges": [
+                {
+                    "from_node": edge.from_node,
+                    "to_node": edge.to_node,
+                    "relationship_type": edge.relationship_type,
+                    "label": edge.label
+                }
+                for edge in result["edges"]
+            ],
+            "center_node": result["center_node"]
+        }
+        
+        connection.send_result(msg["id"], serialized_result)
+    except ValueError as error:
+        _LOGGER.warning("Invalid entity requested: %s", error)
+        connection.send_error(
+            msg["id"], 
+            websocket_api.const.ERR_NOT_FOUND, 
+            str(error)
+        )
+    except Exception as error:
+        _LOGGER.error("Error getting neighborhood: %s", error)
+        connection.send_error(
+            msg["id"], 
+            websocket_api.const.ERR_UNKNOWN_ERROR, 
+            str(error)
+        )

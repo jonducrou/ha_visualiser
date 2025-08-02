@@ -1,0 +1,7 @@
+{
+  "name": "Home Assistant Entity Visualizer",
+  "render_readme": true,
+  "domains": ["ha_visualiser"],
+  "iot_class": "Local Polling",
+  "homeassistant": "2023.7.0"
+}
