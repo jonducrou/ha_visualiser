@@ -7,6 +7,8 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.components.http import StaticPathConfig
+from homeassistant.components import panel_custom
 
 from .const import DOMAIN
 from .graph_service import GraphService
@@ -38,24 +40,24 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_register_websocket_handlers(hass)
     
     # Register the frontend panel
-    hass.http.register_static_path(
-        "/hacsfiles/ha_visualiser",
-        hass.config.path("custom_components/ha_visualiser/www"),
-        cache_headers=False,
-    )
+    await hass.http.async_register_static_paths([
+        StaticPathConfig(
+            "/hacsfiles/ha_visualiser",
+            hass.config.path("custom_components/ha_visualiser/www"),
+            False
+        )
+    ])
     
     # Register the panel
-    hass.components.frontend.async_register_built_in_panel(
-        component_name="custom",
+    await panel_custom.async_register_panel(
+        hass,
+        frontend_url_path="ha_visualiser",
+        webcomponent_name="ha-visualiser-panel",
         sidebar_title="Entity Visualizer",
         sidebar_icon="mdi:graph",
-        frontend_url_path="ha_visualiser",
-        config={
-            "_panel_custom": {
-                "name": "ha-visualiser-panel",
-                "module_url": "/hacsfiles/ha_visualiser/ha-visualiser-panel.js",
-            }
-        },
+        module_url="/hacsfiles/ha_visualiser/ha-visualiser-panel.js",
+        config={},
+        require_admin=False,
     )
     
     _LOGGER.info("Home Assistant Entity Visualizer integration loaded successfully")
@@ -66,33 +68,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Home Assistant Entity Visualizer from a config entry."""
     hass.data.setdefault(DOMAIN, {})
     
-    # Initialize the graph service
-    graph_service = GraphService(hass)
-    hass.data[DOMAIN]["graph_service"] = graph_service
-    
-    # Register websocket API handlers
-    async_register_websocket_handlers(hass)
-    
-    # Register the frontend panel
-    hass.http.register_static_path(
-        "/hacsfiles/ha_visualiser",
-        hass.config.path("custom_components/ha_visualiser/www"),
-        cache_headers=False,
-    )
-    
-    # Register the panel
-    hass.components.frontend.async_register_built_in_panel(
-        component_name="custom",
-        sidebar_title="Entity Visualizer",
-        sidebar_icon="mdi:graph",
-        frontend_url_path="ha_visualiser",
-        config={
-            "_panel_custom": {
-                "name": "ha-visualiser-panel",
-                "module_url": "/hacsfiles/ha_visualiser/ha-visualiser-panel.js",
-            }
-        },
-    )
+    # Check if already set up to avoid duplicates
+    if "graph_service" not in hass.data[DOMAIN]:
+        # Initialize the graph service
+        graph_service = GraphService(hass)
+        hass.data[DOMAIN]["graph_service"] = graph_service
+        
+        # Register websocket API handlers
+        async_register_websocket_handlers(hass)
+        
+        # Register the frontend panel
+        await hass.http.async_register_static_paths([
+            StaticPathConfig(
+                "/hacsfiles/ha_visualiser",
+                hass.config.path("custom_components/ha_visualiser/www"),
+                False
+            )
+        ])
+        
+        # Register the panel
+        await panel_custom.async_register_panel(
+            hass,
+            frontend_url_path="ha_visualiser",
+            webcomponent_name="ha-visualiser-panel",
+            sidebar_title="Entity Visualizer",
+            sidebar_icon="mdi:graph",
+            module_url="/hacsfiles/ha_visualiser/ha-visualiser-panel.js",
+            config={},
+            require_admin=False,
+        )
     
     _LOGGER.info("Home Assistant Entity Visualizer integration loaded")
     return True

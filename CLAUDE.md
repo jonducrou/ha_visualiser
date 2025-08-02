@@ -54,3 +54,7 @@ No specific build commands yet - this is a pure HA custom integration.
 2. Use HA developer tools for debugging
 3. Test frontend via HA panel interface
 4. HACS validation for distribution
+
+## Additional Notes
+
+"async_register_built_in_panel" is deprecated, do not use.
