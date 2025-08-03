@@ -58,7 +58,7 @@ async def websocket_search_entities(
 @websocket_api.websocket_command({
     vol.Required("type"): "ha_visualiser/get_neighborhood",
     vol.Required("entity_id"): str,
-    vol.Optional("max_depth", default=1): int,
+    vol.Optional("max_depth", default=2): int,
 })
 @websocket_api.async_response
 async def websocket_get_neighborhood(
@@ -119,7 +119,7 @@ async def websocket_get_neighborhood(
 @websocket_api.websocket_command({
     vol.Required("type"): "ha_visualiser/get_filtered_neighborhood",
     vol.Required("entity_id"): str,
-    vol.Optional("max_depth", default=1): int,
+    vol.Optional("max_depth", default=2): int,
     vol.Optional("domain_filter"): [str],
     vol.Optional("area_filter"): [str],
     vol.Optional("relationship_filter"): [str],

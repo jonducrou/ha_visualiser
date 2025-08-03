@@ -71,10 +71,11 @@ class GraphService:
         nodes = {}
         edges = []
         visited = set()
+        edge_set = set()  # Track edges to prevent duplicates
         
         # Start with the target entity or device
         await self._add_entity_and_neighbors(
-            entity_id, nodes, edges, visited, max_depth
+            entity_id, nodes, edges, visited, edge_set, max_depth
         )
         
         return {
@@ -201,11 +202,12 @@ class GraphService:
         nodes = {}
         edges = []
         visited = set()
+        edge_set = set()  # Track edges to prevent duplicates
         filtered_count = 0
         
         # Start with the target entity
         await self._add_entity_and_neighbors_filtered(
-            entity_id, nodes, edges, visited, max_depth,
+            entity_id, nodes, edges, visited, edge_set, max_depth,
             domain_filter, area_filter, relationship_filter, filtered_count
         )
         
@@ -266,6 +268,7 @@ class GraphService:
         nodes: Dict[str, GraphNode], 
         edges: List[GraphEdge], 
         visited: Set[str], 
+        edge_set: Set[str],
         depth: int,
         domain_filter: List[str] = None,
         area_filter: List[str] = None, 
@@ -299,17 +302,18 @@ class GraphService:
                         # Check if related entity passes filters
                         related_node = await self._create_node(related_id)
                         if related_node and self._passes_filters(related_node, domain_filter, area_filter):
-                            # Add edge
-                            edges.append(GraphEdge(
-                                from_node=entity_id,
-                                to_node=related_id,
-                                relationship_type=relationship_type,
-                                label=relationship_type.replace("_", " ").title()
-                            ))
+                            # Use centralized edge creation for consistent directions
+                            edge = self._create_symmetrical_edge(entity_id, related_id, relationship_type)
+                            if edge:
+                                # Create unique edge identifier for deduplication
+                                edge_key = f"{edge.from_node}:{edge.to_node}:{edge.relationship_type}"
+                                if edge_key not in edge_set:
+                                    edges.append(edge)
+                                    edge_set.add(edge_key)
                             
                             # Recursively add neighbor
                             filtered_count = await self._add_entity_and_neighbors_filtered(
-                                related_id, nodes, edges, visited, depth - 1,
+                                related_id, nodes, edges, visited, edge_set, depth - 1,
                                 domain_filter, area_filter, relationship_filter, filtered_count
                             )
                         else:
@@ -340,6 +344,7 @@ class GraphService:
         nodes: Dict[str, GraphNode], 
         edges: List[GraphEdge], 
         visited: Set[str], 
+        edge_set: Set[str],
         depth: int
     ) -> None:
         """Recursively add entity and its neighbors to the graph."""
@@ -359,103 +364,108 @@ class GraphService:
                 
                 for related_id, relationship_type in related_entities:
                     if related_id not in visited:
-                        # Create edges with consistent directions based on relationship type
-                        # Direction is always logical: Container -> Contained, Actor -> Target
-                        
-                        if relationship_type == "has_entity":
-                            # Container -> Entity (Device/Area/Zone has Entity)
-                            from_node = related_id
-                            to_node = entity_id
-                            if related_id.startswith("device:"):
-                                label = "has"
-                            elif related_id.startswith("area:"):
-                                label = "contains"
-                            elif related_id.startswith("zone."):
-                                label = "contains"
-                            else:
-                                label = "has"
-                        elif relationship_type == "device_has":
-                            # Device -> Entity (when viewing device node)
-                            from_node = entity_id  # This is the device node we're viewing
-                            to_node = related_id   # This is the entity
-                            label = "has entity"
-                        elif relationship_type == "area_contains":
-                            # Area -> Entity (when viewing area node)
-                            from_node = entity_id  # This is the area node we're viewing
-                            to_node = related_id   # This is the entity
-                            label = "contains"
-                        elif relationship_type == "area_contains_device":
-                            # Area -> Device (when viewing area node)
-                            from_node = entity_id  # This is the area node we're viewing
-                            to_node = related_id   # This is the device
-                            label = "contains"
-                        elif relationship_type == "device_in_area":
-                            # Area -> Device (when viewing device node, show containing area)
-                            from_node = related_id  # This is the area
-                            to_node = entity_id     # This is the device we're viewing
-                            label = "contains"
-                        elif relationship_type == "zone_contains":
-                            # Zone -> Entity (when viewing zone node)
-                            from_node = entity_id  # This is the zone node we're viewing
-                            to_node = related_id   # This is the entity
-                            label = "contains"
-                        elif relationship_type == "in_zone":
-                            # Zone -> Entity (Zone contains Entity)
-                            from_node = related_id
-                            to_node = entity_id
-                            label = "contains"
-                        elif relationship_type.startswith("triggers:"):
-                            # Entity -> Automation (Entity triggers Automation)
-                            from_node = entity_id
-                            to_node = related_id
-                            label = "triggers"
-                        elif relationship_type.startswith("controls:"):
-                            # Automation -> Entity (Automation controls Entity)
-                            from_node = related_id
-                            to_node = entity_id
-                            label = "controls"
-                        elif relationship_type.startswith("automation_trigger:"):
-                            # Entity -> Automation (Entity triggers Automation)
-                            from_node = entity_id
-                            to_node = related_id
-                            label = "triggers"
-                        elif relationship_type.startswith("automation_action:"):
-                            # Automation -> Entity (Automation controls Entity)
-                            from_node = related_id
-                            to_node = entity_id
-                            label = "controls"
-                        elif relationship_type.startswith("triggers:"):
-                            # Entity -> Automation (when viewing automation node)
-                            from_node = related_id  # Entity that triggers
-                            to_node = entity_id     # Automation being viewed
-                            label = "triggers"
-                        elif relationship_type.startswith("controls:"):
-                            # Automation -> Entity (when viewing automation node)
-                            from_node = entity_id   # Automation being viewed
-                            to_node = related_id    # Entity being controlled
-                            label = "controls"
-                        elif relationship_type.startswith("template:"):
-                            # Template -> Entity (Template uses Entity)
-                            from_node = related_id
-                            to_node = entity_id
-                            label = "uses"
-                        else:
-                            # Default: assume related item contains/has the entity
-                            from_node = related_id
-                            to_node = entity_id
-                            label = relationship_type.replace("_", " ")
-                        
-                        edges.append(GraphEdge(
-                            from_node=from_node,
-                            to_node=to_node,
-                            relationship_type=relationship_type,
-                            label=label
-                        ))
+                        # Use centralized edge creation for consistent directions
+                        edge = self._create_symmetrical_edge(entity_id, related_id, relationship_type)
+                        if edge:
+                            # Create unique edge identifier for deduplication
+                            edge_key = f"{edge.from_node}:{edge.to_node}:{edge.relationship_type}"
+                            if edge_key not in edge_set:
+                                edges.append(edge)
+                                edge_set.add(edge_key)
                         
                         # Recursively add neighbor
                         await self._add_entity_and_neighbors(
-                            related_id, nodes, edges, visited, depth - 1
+                            related_id, nodes, edges, visited, edge_set, depth - 1
                         )
+    
+    def _create_symmetrical_edge(self, node_a: str, node_b: str, relationship_type: str) -> GraphEdge | None:
+        """Create a symmetrical edge with consistent direction regardless of discovery order.
+        
+        Edge directions are determined by node types and relationship semantics, not by which
+        node was discovered first. This ensures symmetrical navigation.
+        """
+        
+        
+        # Determine canonical direction based on node types and relationship semantics
+        # Priority hierarchy: area > device > entity > automation > zone
+        
+        def get_node_priority(node_id: str) -> int:
+            """Get priority for canonical edge ordering."""
+            if node_id.startswith("area:"):
+                return 1  # Highest priority - areas contain everything
+            elif node_id.startswith("device:"):
+                return 2  # Devices contain entities
+            elif node_id.startswith("zone."):
+                return 3  # Zones contain entities
+            elif node_id.startswith("automation."):
+                return 4  # Automations have specific trigger/control semantics
+            else:
+                return 5  # Regular entities
+        
+        # Standard containment relationships - always container -> contained
+        if relationship_type in ["has_entity", "device_has", "area_contains", "area_contains_device", 
+                                "device_in_area", "zone_contains", "in_zone"]:
+            
+            priority_a = get_node_priority(node_a)
+            priority_b = get_node_priority(node_b)
+            
+            # Container (lower priority number) -> Contained (higher priority number)
+            if priority_a < priority_b:
+                from_node, to_node = node_a, node_b
+            else:
+                from_node, to_node = node_b, node_a
+                
+            # Determine label based on container type
+            if from_node.startswith("area:"):
+                label = "contains"
+            elif from_node.startswith("device:"):
+                label = "has entity"
+            elif from_node.startswith("zone."):
+                label = "contains"
+            else:
+                label = "contains"
+                
+        # Automation relationships have specific semantics
+        elif relationship_type == "automation_trigger":
+            # Entity -> Automation (Entity triggers Automation)
+            if node_a.startswith("automation."):
+                from_node, to_node = node_b, node_a  # entity -> automation
+            else:
+                from_node, to_node = node_a, node_b  # entity -> automation
+            label = "triggers"
+            
+        elif relationship_type == "automation_action":
+            # Automation -> Entity (Automation controls Entity)
+            if node_a.startswith("automation."):
+                from_node, to_node = node_a, node_b  # automation -> entity
+            else:
+                from_node, to_node = node_b, node_a  # automation -> entity
+            label = "controls"
+            
+        elif relationship_type.startswith("template:"):
+            # Template -> Entity (Template uses Entity)
+            # For now, assume template relationships point from template to entity
+            from_node, to_node = node_a, node_b
+            label = "uses"
+            
+        else:
+            # Default: use node priority to determine direction
+            priority_a = get_node_priority(node_a)
+            priority_b = get_node_priority(node_b)
+            
+            if priority_a <= priority_b:
+                from_node, to_node = node_a, node_b
+            else:
+                from_node, to_node = node_b, node_a
+                
+            label = relationship_type.replace("_", " ")
+        
+        return GraphEdge(
+            from_node=from_node,
+            to_node=to_node,
+            relationship_type=relationship_type,
+            label=label
+        )
 
     async def _create_node(self, entity_id: str) -> GraphNode | None:
         """Create a graph node for an entity or device."""
@@ -656,31 +666,29 @@ class GraphService:
             
             return related
         
-        # Handle regular entity relationships
-        entity_entry = self._entity_registry.async_get(entity_id)
-        
-        if not entity_entry:
-            return related
-        
-        # Device-based relationships
-        device_related = await self._find_device_relationships(entity_entry)
-        related.extend(device_related)
-        
-        # Area-based relationships (exclude entities already found via device)
-        area_related = await self._find_area_relationships(entity_entry, device_related)
-        related.extend(area_related)
-        
-        # Zone-based relationships
-        zone_related = await self._find_zone_relationships(entity_id)
-        related.extend(zone_related)
-        
-        # Automation-based relationships
+        # Automation-based relationships (do this for ALL entities, including automations)
         automation_related = await self._find_automation_relationships(entity_id)
         related.extend(automation_related)
         
-        # Template-based relationships
-        template_related = await self._find_template_relationships(entity_id)
-        related.extend(template_related)
+        # Handle regular entity relationships
+        entity_entry = self._entity_registry.async_get(entity_id)
+        
+        if entity_entry:
+            # Device-based relationships
+            device_related = await self._find_device_relationships(entity_entry)
+            related.extend(device_related)
+            
+            # Area-based relationships (exclude entities already found via device)
+            area_related = await self._find_area_relationships(entity_entry, device_related)
+            related.extend(area_related)
+            
+            # Zone-based relationships
+            zone_related = await self._find_zone_relationships(entity_id)
+            related.extend(zone_related)
+            
+            # Template-based relationships
+            template_related = await self._find_template_relationships(entity_id)
+            related.extend(template_related)
         
         return related
 
@@ -902,12 +910,12 @@ class GraphService:
             # Check if our entity is referenced in triggers
             if self._entity_referenced_in_config(entity_id, triggers):
                 automation_name = state.attributes.get("friendly_name", automation_id)
-                related.append((automation_id, f"automation_trigger:{automation_name}"))
+                related.append((automation_id, "automation_trigger"))
                 _LOGGER.debug(f"  Found trigger relationship: {automation_name}")
             # Check if our entity is referenced in actions  
             elif self._entity_referenced_in_config(entity_id, actions):
                 automation_name = state.attributes.get("friendly_name", automation_id)
-                related.append((automation_id, f"automation_action:{automation_name}"))
+                related.append((automation_id, "automation_action"))
                 _LOGGER.debug(f"  Found action relationship: {automation_name}")
         
         _LOGGER.debug(f"Total automation relationships found: {len(related)}")
@@ -995,7 +1003,7 @@ class GraphService:
         
         for entity_id in trigger_entities:
             if entity_id != automation_id:  # Avoid self-reference
-                related.append((entity_id, f"triggers:{automation_name}"))
+                related.append((entity_id, "automation_trigger"))
                 _LOGGER.debug(f"Added trigger relationship: {entity_id} -> {automation_name}")
         
         # Parse actions for entity references (try both 'actions' and 'action')
@@ -1008,8 +1016,8 @@ class GraphService:
         _LOGGER.debug(f"Found action entities: {action_entities}")
         
         for entity_id in action_entities:
-            if entity_id != automation_id and (entity_id, f"triggers:{automation_name}") not in related:
-                related.append((entity_id, f"controls:{automation_name}"))
+            if entity_id != automation_id and (entity_id, "automation_trigger") not in related:
+                related.append((entity_id, "automation_action"))
                 _LOGGER.debug(f"Added control relationship: {automation_name} -> {entity_id}")
         
         _LOGGER.debug(f"Total entities found for {automation_name}: {len(related)}")
@@ -1032,9 +1040,19 @@ class GraphService:
             # Check direct entity_id references
             entity_id = config.get("entity_id")
             if isinstance(entity_id, str):
-                entities.add(entity_id)
+                # Check if this is a UUID that needs to be resolved to actual entity_id
+                resolved_entity_id = self._resolve_entity_uuid(entity_id)
+                if resolved_entity_id:
+                    entities.add(resolved_entity_id)
+                else:
+                    entities.add(entity_id)  # Add as-is if not a UUID
             elif isinstance(entity_id, list):
-                entities.update(entity_id)
+                for eid in entity_id:
+                    resolved_entity_id = self._resolve_entity_uuid(eid)
+                    if resolved_entity_id:
+                        entities.add(resolved_entity_id)
+                    else:
+                        entities.add(eid)
                 
             # Check in service data
             service_data = config.get("data", {})
@@ -1057,8 +1075,23 @@ class GraphService:
             # Check device_id references and resolve to entities
             device_id = config.get("device_id")
             if device_id:
-                device_entities = self._get_entities_for_device(device_id)
-                entities.update(device_entities)
+                # If there's both device_id and entity_id, prioritize the specific entity
+                specific_entity_id = config.get("entity_id")
+                if specific_entity_id:
+                    # Resolve UUID to actual entity ID if needed
+                    resolved_entity_id = self._resolve_entity_uuid(specific_entity_id)
+                    if resolved_entity_id:
+                        entities.add(resolved_entity_id)
+                        _LOGGER.debug(f"Found specific entity {resolved_entity_id} on device {device_id}")
+                    else:
+                        # UUID resolution failed, fall back to all device entities
+                        device_entities = self._get_entities_for_device(device_id)
+                        entities.update(device_entities)
+                        _LOGGER.debug(f"Could not resolve entity UUID {specific_entity_id}, using all device entities: {device_entities}")
+                else:
+                    # No specific entity, use all device entities
+                    device_entities = self._get_entities_for_device(device_id)
+                    entities.update(device_entities)
                 
             # Check area_id references and resolve to entities  
             area_id = config.get("area_id")
@@ -1074,6 +1107,33 @@ class GraphService:
                     entities.update(self._extract_entities_from_config([value]))
         
         return entities
+
+    def _resolve_entity_uuid(self, uuid_or_entity_id: str) -> str | None:
+        """Resolve entity UUID to actual entity ID, or return None if it's not a UUID."""
+        # Entity UUIDs are typically 32-character hex strings without dots
+        if len(uuid_or_entity_id) == 32 and all(c in '0123456789abcdef' for c in uuid_or_entity_id.lower()):
+            # This looks like a UUID, try to resolve it
+            try:
+                # Look through entity registry to find entity with this UUID
+                for entity_entry in self._entity_registry.entities.values():
+                    if hasattr(entity_entry, 'id') and entity_entry.id == uuid_or_entity_id:
+                        _LOGGER.debug(f"Resolved UUID {uuid_or_entity_id} to entity {entity_entry.entity_id}")
+                        return entity_entry.entity_id
+                    elif hasattr(entity_entry, 'unique_id') and entity_entry.unique_id == uuid_or_entity_id:
+                        _LOGGER.debug(f"Resolved unique_id {uuid_or_entity_id} to entity {entity_entry.entity_id}")
+                        return entity_entry.entity_id
+                        
+                _LOGGER.debug(f"Could not resolve UUID {uuid_or_entity_id} to any entity")
+                return None
+            except Exception as e:
+                _LOGGER.debug(f"Error resolving UUID {uuid_or_entity_id}: {e}")
+                return None
+        
+        # Not a UUID pattern, return as-is if it's a valid entity ID format
+        if '.' in uuid_or_entity_id:
+            return uuid_or_entity_id
+        
+        return None
 
     def _get_entities_for_device(self, device_id: str) -> Set[str]:
         """Get all entity IDs for a given device."""

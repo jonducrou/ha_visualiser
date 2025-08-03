@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.3.2: Connected callback started - Fixed automation relationship symmetry');
+    console.log('HA Visualiser Panel v0.4.0: Complete automation relationship support');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
@@ -437,6 +437,9 @@ class HaVisualiserPanel extends HTMLElement {
         hierarchical: {
           direction: 'UD',        // Left to Right
           sortMethod: 'directed', // Respects edge directions
+          edgeMinimization: true,    // Reduces edge crossings
+          blockShifting: true,       // Reduces whitespace and crossings
+          parentCentralization: true, // Centers parents over children
           levelSeparation: 150,   // Horizontal spacing between levels
           nodeSpacing: 100,       // Vertical spacing between nodes
           treeSpacing: 200        // Spacing between separate trees
