@@ -532,7 +532,7 @@ class GraphService:
             from_node, to_node = node_a, node_b
             label = "uses"
             
-        elif relationship_type == "labelled" or relationship_type.startswith("shares_label:"):
+        elif relationship_type == "labelled":
             # Label -> Object (Label labels Object)
             if node_a.startswith("label:"):
                 from_node, to_node = node_a, node_b  # label -> object
@@ -1516,41 +1516,22 @@ class GraphService:
         return related
 
     async def _find_label_relationships(self, entity_entry) -> List[tuple[str, str]]:
-        """Find entities related through shared labels."""
+        """Find label relationships for entity."""
         related = []
         
         if not entity_entry or not entity_entry.labels:
             return related
         
-        # For each label on this entity
+        # For each label on this entity, create a relationship to the label node
+        # The label node will handle showing all other items with the same label
         for label_id in entity_entry.labels:
             label_entry = self._label_registry.async_get_label(label_id)
             if not label_entry:
                 continue
             
-            # Create a label node to show in the graph
+            # Create relationship to label node: label -> entity
             label_node_id = f"label:{label_id}"
             related.append((label_node_id, "labelled"))
-            
-            # Find other entities with the same label (these will be connected via the label node)
-            related_entities = self._get_entities_for_label(label_id)
-            for related_entity in related_entities:
-                if related_entity.entity_id != entity_entry.entity_id:
-                    # The relationship will be: current_entity -> label -> other_entity
-                    # This creates the reverse relationship for symmetrical navigation
-                    related.append((related_entity.entity_id, f"shares_label:{label_entry.name}"))
-            
-            # Find devices with the same label
-            related_devices = self._get_devices_for_label(label_id)
-            for device in related_devices:
-                device_node_id = f"device:{device.id}"
-                related.append((device_node_id, f"shares_label:{label_entry.name}"))
-            
-            # Find areas with the same label
-            related_areas = self._get_areas_for_label(label_id)
-            for area in related_areas:
-                area_node_id = f"area:{area.id}"
-                related.append((area_node_id, f"shares_label:{label_entry.name}"))
         
         return related
 
