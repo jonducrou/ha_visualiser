@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.4.0: Complete automation relationship support');
+    console.log('HA Visualiser Panel v0.4.2: Fixed vis.js configuration errors');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
@@ -402,20 +402,30 @@ class HaVisualiserPanel extends HTMLElement {
     // Prepare vis.js data
     const visNodes = new vis.DataSet(nodes.map(node => {
       const isFocusNode = node.id === graphData.center_node;
+      const icon = this.getEntityIcon(node.domain);
+      const backgroundColor = isFocusNode ? this.getFocusNodeColor(node.domain) : this.getNodeColor(node.domain);
+      
       return {
         id: node.id,
-        label: node.label,
+        label: `${icon} | ${node.label}`,
         title: this.createNodeTooltip(node),
         shape: this.getNodeShape(node.domain),
-        color: isFocusNode ? this.getFocusNodeColor(node.domain) : this.getNodeColor(node.domain),
+        color: {
+          background: backgroundColor,
+          border: isFocusNode ? '#999' : '#D0D0D0',
+          highlight: {
+            background: backgroundColor,
+            border: '#999'
+          }
+        },
         font: { 
           size: isFocusNode ? 14 : 12, 
-          color: isFocusNode ? '#000' : '#333',
+          color: '#333',
           bold: isFocusNode
         },
-        borderWidth: isFocusNode ? 4 : 1,
-        borderWidthSelected: 4,
-        shadow: isFocusNode ? { enabled: true, size: 10, x: 0, y: 0 } : true
+        borderWidth: isFocusNode ? 3 : 1,
+        shadow: false,
+        margin: 8
       };
     }));
     
@@ -464,15 +474,40 @@ class HaVisualiserPanel extends HTMLElement {
       },
       nodes: {
         borderWidth: 1,
-        shadow: true,
-        font: { size: 12 }
+        shadow: false,
+        font: { 
+          size: 12,
+          color: '#333'
+        },
+        shape: 'box',
+        margin: 8,
+        color: {
+          border: '#D0D0D0'
+        },
+        chosen: {
+          node: function(values, id, selected, hovering) {
+            values.borderColor = '#999';
+            values.borderWidth = 2;
+          }
+        }
       },
       edges: {
-        width: 2,
-        shadow: true,
+        width: 1.5,
+        shadow: false,
         smooth: {
           type: 'continuous',
-          roundness: 0.3
+          roundness: 0.2
+        },
+        color: {
+          color: '#D0D0D0',
+          highlight: '#999',
+          hover: '#999'
+        },
+        arrows: {
+          to: {
+            enabled: true,
+            scaleFactor: 0.8
+          }
         }
       }
     };
@@ -566,74 +601,111 @@ class HaVisualiserPanel extends HTMLElement {
   }
   
   getNodeShape(domain) {
-    const shapes = {
-      'light': 'dot',
-      'switch': 'square',
-      'sensor': 'triangle',
-      'automation': 'star',
-      'script': 'hexagon',
-      'scene': 'diamond',
-      'input_boolean': 'square',
-      'input_number': 'box',
-      'binary_sensor': 'triangle',
-      'device_tracker': 'dot',
-      'device': 'database',
-      'area': 'box',
-      'zone': 'circle'
-    };
-    return shapes[domain] || 'ellipse';
+    // Use consistent rounded box shape for all nodes
+    return 'box';
   }
   
   getNodeColor(domain) {
+    // Light, subtle color palette
     const colors = {
-      'light': '#FFA726',
-      'switch': '#66BB6A',
-      'sensor': '#42A5F5', 
-      'automation': '#AB47BC',
-      'script': '#EF5350',
-      'scene': '#FFCA28',
-      'input_boolean': '#26C6DA',
-      'input_number': '#5C6BC0',
-      'binary_sensor': '#78909C',
-      'device_tracker': '#FF7043',
-      'device': '#795548',
-      'area': '#607D8B',
-      'zone': '#00BCD4'
+      'light': '#F5F5F5',        // Light grey
+      'switch': '#F0F4F8',       // Very light blue
+      'sensor': '#F7F9FC',       // Very light blue-grey
+      'automation': '#FDF4FF',   // Very light purple
+      'script': '#FFF5F5',       // Very light red
+      'scene': '#FFFDF0',        // Very light yellow
+      'input_boolean': '#F0FDFF', // Very light cyan
+      'input_number': '#F5F3FF',  // Very light indigo
+      'binary_sensor': '#F8F9FA', // Light grey
+      'device_tracker': '#FFF8F0', // Very light orange
+      'device': '#F6F6F6',       // Light grey
+      'area': '#F0F8F0',         // Very light green
+      'zone': '#F0FDFD',         // Very light teal
+      'media_player': '#FFF0F8',  // Very light pink
+      'number': '#F8F5FF',       // Very light violet
+      'todo': '#F5FFF0'          // Very light lime
     };
-    return colors[domain] || '#90A4AE';
+    return colors[domain] || '#F8F9FA';
   }
   
   getFocusNodeColor(domain) {
-    // Brighter, more prominent colors for the focus node
+    // Slightly more prominent but still subtle colors for the focus node
     const focusColors = {
-      'light': '#FF8F00',        // Bright orange
-      'switch': '#4CAF50',       // Bright green
-      'sensor': '#2196F3',       // Bright blue
-      'automation': '#9C27B0',   // Bright purple
-      'script': '#F44336',       // Bright red
-      'scene': '#FFC107',        // Bright yellow
-      'input_boolean': '#00BCD4', // Bright cyan
-      'input_number': '#3F51B5',  // Bright indigo
-      'binary_sensor': '#607D8B', // Blue grey
-      'device_tracker': '#FF5722', // Deep orange
-      'device': '#5D4037',       // Brown
-      'area': '#455A64',         // Blue grey
-      'zone': '#00ACC1'          // Cyan
+      'light': '#E8E8E8',        // Slightly darker grey
+      'switch': '#E1EBF0',       // Slightly darker light blue
+      'sensor': '#EDF2F7',       // Slightly darker blue-grey
+      'automation': '#F4E6FF',   // Slightly darker light purple
+      'script': '#FFE8E8',       // Slightly darker light red
+      'scene': '#FFF8E1',        // Slightly darker light yellow
+      'input_boolean': '#E1F8FF', // Slightly darker light cyan
+      'input_number': '#E8E1FF',  // Slightly darker light indigo
+      'binary_sensor': '#F0F1F2', // Slightly darker grey
+      'device_tracker': '#FFE8D6', // Slightly darker light orange
+      'device': '#E8E8E8',       // Slightly darker grey
+      'area': '#E1F0E1',         // Slightly darker light green
+      'zone': '#E1F8F8',         // Slightly darker light teal
+      'media_player': '#FFE1F0',  // Slightly darker light pink
+      'number': '#F0E8FF',       // Slightly darker light violet
+      'todo': '#E8FFE1'          // Slightly darker light lime
     };
-    return focusColors[domain] || '#546E7A';
+    return focusColors[domain] || '#F0F1F2';
+  }
+  
+  getEntityIcon(domain) {
+    // Map Home Assistant domains to simple text icons
+    const icons = {
+      'light': '💡',
+      'switch': '🔌',
+      'sensor': '📊',
+      'automation': '🤖',
+      'script': '📝',
+      'scene': '🎬',
+      'input_boolean': '☑️',
+      'input_number': '🔢',
+      'binary_sensor': '📡',
+      'device_tracker': '📍',
+      'device': '📱',
+      'area': '🏠',
+      'zone': '📍',
+      'media_player': '🔊',
+      'number': '🔢',
+      'todo': '✅',
+      'climate': '🌡️',
+      'cover': '🪟',
+      'fan': '💨',
+      'vacuum': '🧹',
+      'camera': '📷',
+      'lock': '🔒',
+      'alarm_control_panel': '🚨',
+      'weather': '🌤️',
+      'sun': '☀️',
+      'person': '👤',
+      'button': '🔘',
+      'select': '📋',
+      'input_select': '📋',
+      'input_text': '📝',
+      'input_datetime': '📅',
+      'timer': '⏲️',
+      'counter': '🔢',
+      'remote': '📱',
+      'water_heater': '🚿',
+      'humidifier': '💧',
+      'siren': '🚨',
+      'update': '🔄',
+      'calendar': '📅'
+    };
+    return icons[domain] || '⚫';
   }
   
   getEdgeColor(relationshipType) {
-    if (relationshipType === 'has_entity') return '#4CAF50';
-    if (relationshipType === 'in_zone') return '#00BCD4';
-    if (relationshipType.startsWith('belongs_to:')) return '#795548';
-    if (relationshipType.startsWith('device:')) return '#4CAF50';
-    if (relationshipType.startsWith('area:')) return '#607D8B';
-    if (relationshipType.startsWith('automation')) return '#9C27B0';
-    if (relationshipType.startsWith('template:')) return '#FF9800';
-    if (relationshipType.startsWith('triggers:')) return '#E91E63';
-    if (relationshipType.startsWith('controls:')) return '#3F51B5';
-    return '#757575';
+    // Simple, subtle edge colors
+    if (relationshipType.includes('automation') || relationshipType.includes('trigger') || relationshipType.includes('control')) {
+      return '#B0B0B0';  // Light grey for automation relationships
+    }
+    if (relationshipType.includes('area') || relationshipType.includes('contains') || relationshipType.includes('device')) {
+      return '#C0C0C0';  // Slightly lighter grey for containment relationships
+    }
+    return '#D0D0D0';    // Very light grey for other relationships
   }
   
   setupGraphControls() {
