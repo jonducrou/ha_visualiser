@@ -13,6 +13,7 @@ A powerful Home Assistant custom integration that visualizes your smart home as 
 ### 🔍 **Comprehensive Relationship Detection**
 - **Device Relationships**: Physical device to entity mappings
 - **Area & Zone Hierarchies**: Spatial organization and containment
+- **Label Organization**: Home Assistant label-based groupings and classifications
 - **Automation Dependencies**: Complete trigger and control relationship chains
 - **Template References**: Template sensor/switch entity dependencies
 - **Symmetrical Navigation**: Bidirectional relationship discovery and visualization
@@ -21,7 +22,7 @@ A powerful Home Assistant custom integration that visualizes your smart home as 
 - **Interactive Navigation**: Click any node to explore its neighborhood  
 - **2-Level Depth**: Rich context showing extended relationship networks
 - **Adaptive Layouts**: Automatic algorithm selection based on graph complexity
-- **Search & Discovery**: Powerful search across entities, devices, areas, and zones
+- **Search & Discovery**: Powerful search across entities, devices, areas, zones, and labels
 - **Consistent Arrows**: Logical relationship directions (container → contained, actor → target)
 
 ### 🎯 **Smart Entity Management**
@@ -36,10 +37,12 @@ A powerful Home Assistant custom integration that visualizes your smart home as 
 - **Impact Analysis**: Understand which entities are connected before making changes
 - **Automation Debugging**: Visualize trigger → automation → control chains
 - **Device Organization**: See device-to-entity mappings and area hierarchies
+- **Label Management**: Explore label-based groupings and organizational structures
 - **Orphan Detection**: Identify isolated or unused entities
 
 ### **🎯 Planning & Optimization** 
 - **Area Planning**: Visualize and optimize room/area organization
+- **Label Strategy**: Design and refine your labeling system for better organization
 - **Automation Design**: Understand existing patterns before creating new automations
 - **Template Dependencies**: See which entities your templates depend on
 - **System Understanding**: Get a bird's-eye view of your smart home ecosystem
@@ -67,14 +70,14 @@ A powerful Home Assistant custom integration that visualizes your smart home as 
 
 ### **Basic Navigation**
 1. **Open the Panel**: Click "Entity Visualizer" in your HA sidebar
-2. **Search**: Type in the search box to find entities, devices, areas, or zones
+2. **Search**: Type in the search box to find entities, devices, areas, zones, or labels
 3. **Explore**: Click on any entity to see its neighborhood relationships
 4. **Navigate**: Click on connected nodes to explore different areas of your smart home
 
 ### **Understanding the Visualization**
-- **Nodes**: Represent entities, devices, areas, zones, and automations
-- **Arrows**: Show relationship directions (container → contained, trigger → automation → control)
-- **Icons**: Visual indicators for entity types (💡🔌🤖🏠📍)
+- **Nodes**: Represent entities, devices, areas, zones, labels, and automations
+- **Arrows**: Show relationship directions (container → contained, label → labeled, trigger → automation → control)
+- **Icons**: Visual indicators for entity types (💡🔌🤖🏠📍🏷️)
 - **Colors**: Subtle color coding by domain with light, professional palette
 - **Focus**: Selected entities are highlighted with enhanced borders and styling
 
@@ -96,12 +99,13 @@ A powerful Home Assistant custom integration that visualizes your smart home as 
 - **Backend**: Python integration using HA's native APIs
 - **Frontend**: JavaScript with vis.js for graph visualization  
 - **Communication**: Real-time WebSocket API
-- **Data Sources**: Entity registry, device registry, area registry, automation configs
+- **Data Sources**: Entity registry, device registry, area registry, label registry, automation configs
 
 ### **Supported Relationship Types**
 - **Device → Entity**: Physical device contains multiple entities
 - **Area → Device/Entity**: Spatial organization and room assignments
 - **Zone → Entity**: Geographic/proximity-based relationships
+- **Label → Entity/Device/Area**: Organizational labeling and classification
 - **Entity → Automation**: Trigger relationships (state changes activate automations)
 - **Automation → Entity**: Control relationships (automations modify entity states)
 - **Template → Entity**: Dependency relationships (templates reference other entities)
