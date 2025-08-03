@@ -518,6 +518,14 @@ class GraphService:
                 from_node, to_node = node_b, node_a  # automation -> entity
             label = "controls"
             
+        elif relationship_type == "automation_condition":
+            # Automation -> Entity (Automation is conditional on Entity)
+            if node_a.startswith("automation."):
+                from_node, to_node = node_a, node_b  # automation -> entity
+            else:
+                from_node, to_node = node_b, node_a  # automation -> entity
+            label = "conditional on"
+            
         elif relationship_type.startswith("template:"):
             # Template -> Entity (Template uses Entity)
             # For now, assume template relationships point from template to entity
@@ -1076,6 +1084,13 @@ class GraphService:
             
             _LOGGER.debug(f"  Triggers: {len(triggers)}, Actions: {len(actions)}")
             
+            # Parse conditions for entity references (try both 'conditions' and 'condition')
+            conditions = automation_config.get("conditions", automation_config.get("condition", []))
+            if not isinstance(conditions, list):
+                conditions = [conditions] if conditions else []
+            
+            _LOGGER.debug(f"  Triggers: {len(triggers)}, Actions: {len(actions)}, Conditions: {len(conditions)}")
+            
             # Check if our entity is referenced in triggers
             if self._entity_referenced_in_config(entity_id, triggers):
                 automation_name = state.attributes.get("friendly_name", automation_id)
@@ -1086,6 +1101,11 @@ class GraphService:
                 automation_name = state.attributes.get("friendly_name", automation_id)
                 related.append((automation_id, "automation_action"))
                 _LOGGER.debug(f"  Found action relationship: {automation_name}")
+            # Check if our entity is referenced in conditions
+            elif self._entity_referenced_in_conditions(entity_id, conditions):
+                automation_name = state.attributes.get("friendly_name", automation_id)
+                related.append((automation_id, "automation_condition"))
+                _LOGGER.debug(f"  Found condition relationship: {automation_name}")
         
         _LOGGER.debug(f"Total automation relationships found: {len(related)}")
         return related
@@ -1189,6 +1209,20 @@ class GraphService:
                 related.append((entity_id, "automation_action"))
                 _LOGGER.debug(f"Added control relationship: {automation_name} -> {entity_id}")
         
+        # Parse conditions for entity references (try both 'conditions' and 'condition')
+        conditions = automation_config.get("conditions", automation_config.get("condition", []))
+        if not isinstance(conditions, list):
+            conditions = [conditions] if conditions else []
+            
+        _LOGGER.debug(f"Parsing {len(conditions)} conditions: {conditions}")
+        condition_entities = self._extract_entities_from_conditions(conditions)
+        _LOGGER.debug(f"Found condition entities: {condition_entities}")
+        
+        for entity_id in condition_entities:
+            if entity_id != automation_id and (entity_id, "automation_trigger") not in related and (entity_id, "automation_action") not in related:
+                related.append((entity_id, "automation_condition"))
+                _LOGGER.debug(f"Added condition relationship: {automation_name} conditional on {entity_id}")
+        
         _LOGGER.debug(f"Total entities found for {automation_name}: {len(related)}")
         return related
 
@@ -1275,6 +1309,138 @@ class GraphService:
                 elif isinstance(value, dict):
                     entities.update(self._extract_entities_from_config([value]))
         
+        return entities
+
+    def _extract_entities_from_conditions(self, conditions: Any) -> Set[str]:
+        """Extract all entity IDs from automation conditions."""
+        entities = set()
+        
+        _LOGGER.debug(f"Extracting entities from conditions: {conditions}")
+        
+        if not conditions:
+            return entities
+        
+        # Handle different condition formats
+        if isinstance(conditions, str):
+            # Template shorthand condition
+            entities.update(self._extract_entities_from_template_string_advanced(conditions))
+            _LOGGER.debug(f"Found entities in template condition: {entities}")
+        elif isinstance(conditions, dict):
+            # Single condition object
+            entities.update(self._extract_entities_from_condition_config(conditions))
+        elif isinstance(conditions, list):
+            # List of conditions
+            for condition in conditions:
+                entities.update(self._extract_entities_from_conditions(condition))
+        
+        return entities
+
+    def _extract_entities_from_condition_config(self, condition: Dict[str, Any]) -> Set[str]:
+        """Extract entities from a single condition configuration."""
+        entities = set()
+        
+        if not isinstance(condition, dict):
+            return entities
+        
+        condition_type = condition.get("condition")
+        _LOGGER.debug(f"Processing condition type: {condition_type}")
+        
+        # Direct entity_id references
+        entity_id = condition.get("entity_id")
+        if entity_id:
+            if isinstance(entity_id, str):
+                entities.add(entity_id)
+                _LOGGER.debug(f"Found entity_id: {entity_id}")
+            elif isinstance(entity_id, list):
+                entities.update(entity_id)
+                _LOGGER.debug(f"Found entity_id list: {entity_id}")
+        
+        # Zone references (zones are entities)
+        zone = condition.get("zone")
+        if zone:
+            if isinstance(zone, str):
+                entities.add(zone)
+                _LOGGER.debug(f"Found zone: {zone}")
+            elif isinstance(zone, list):
+                entities.update(zone)
+                _LOGGER.debug(f"Found zone list: {zone}")
+        
+        # Device references - convert to entities
+        device_id = condition.get("device_id")
+        if device_id:
+            # Get all entities for this device
+            device_entities = self._get_entities_for_device(device_id)
+            entities.update(device_entities)
+            _LOGGER.debug(f"Found device {device_id} entities: {device_entities}")
+            
+            # If specific entity_id is specified in device condition, prioritize it
+            specific_entity = condition.get("entity_id")
+            if specific_entity:
+                entities.add(specific_entity)
+                _LOGGER.debug(f"Found specific device entity: {specific_entity}")
+        
+        # Template conditions
+        value_template = condition.get("value_template")
+        if value_template:
+            template_entities = self._extract_entities_from_template_string_advanced(value_template)
+            entities.update(template_entities)
+            _LOGGER.debug(f"Found entities in value_template: {template_entities}")
+        
+        # Logical conditions - recursively process nested conditions
+        if condition_type in ["and", "or", "not"]:
+            nested_conditions = condition.get("conditions", [])
+            nested_entities = self._extract_entities_from_conditions(nested_conditions)
+            entities.update(nested_entities)
+            _LOGGER.debug(f"Found entities in nested {condition_type} conditions: {nested_entities}")
+        
+        return entities
+
+    def _extract_entities_from_template_string_advanced(self, template_str: str) -> Set[str]:
+        """Extract entity references from Jinja2 templates with comprehensive patterns."""
+        import re
+        entities = set()
+        
+        if not isinstance(template_str, str):
+            return entities
+        
+        _LOGGER.debug(f"Extracting entities from template: {template_str}")
+        
+        # Common template patterns for entity references
+        patterns = [
+            r"states\(['\"]([^'\"]+)['\"]\)",           # states('entity.id')
+            r"state_attr\(['\"]([^'\"]+)['\"],",       # state_attr('entity.id', 'attr')
+            r"is_state\(['\"]([^'\"]+)['\"],",         # is_state('entity.id', 'state')
+            r"states\.([a-z_]+\.[a-z0-9_]+)",          # states.entity.id
+            r"device_attr\(['\"]([^'\"]+)['\"],",      # device_attr('entity.id', 'attr')
+            r"has_value\(['\"]([^'\"]+)['\"]\)",       # has_value('entity.id')
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, template_str)
+            for match in matches:
+                # Convert states.entity.id format back to entity.id
+                if '.' not in match and pattern.startswith(r"states\."):
+                    # This was a states.entity_id pattern, need to reconstruct
+                    continue
+                entities.add(match)
+                _LOGGER.debug(f"Found entity via pattern {pattern}: {match}")
+        
+        return entities
+
+    def _get_entities_for_device(self, device_id: str) -> Set[str]:
+        """Get all entity IDs for a specific device."""
+        entities = set()
+        for entity_entry in self._entity_registry.entities.values():
+            if entity_entry.device_id == device_id:
+                entities.add(entity_entry.entity_id)
+        return entities
+
+    def _get_entities_for_area(self, area_id: str) -> Set[str]:
+        """Get all entity IDs for a specific area."""
+        entities = set()
+        for entity_entry in self._entity_registry.entities.values():
+            if entity_entry.area_id == area_id:
+                entities.add(entity_entry.entity_id)
         return entities
 
     def _resolve_entity_uuid(self, uuid_or_entity_id: str) -> str | None:
@@ -1422,6 +1588,94 @@ class GraphService:
                         return True
         
         return False
+
+    def _entity_referenced_in_conditions(self, entity_id: str, conditions: Any) -> bool:
+        """Check if entity is referenced in automation conditions."""
+        if not conditions:
+            return False
+        
+        # Handle different condition formats
+        if isinstance(conditions, str):
+            # Template shorthand condition
+            return self._entity_referenced_in_template_string(entity_id, conditions)
+        elif isinstance(conditions, dict):
+            # Single condition object
+            return self._entity_referenced_in_condition(entity_id, conditions)
+        elif isinstance(conditions, list):
+            # List of conditions
+            for condition in conditions:
+                if self._entity_referenced_in_conditions(entity_id, condition):
+                    return True
+        
+        return False
+
+    def _entity_referenced_in_condition(self, entity_id: str, condition: Dict[str, Any]) -> bool:
+        """Check if entity is referenced in a single condition object."""
+        if not isinstance(condition, dict):
+            return False
+        
+        condition_type = condition.get("condition")
+        
+        # Direct entity_id references
+        entity_id_ref = condition.get("entity_id")
+        if entity_id_ref:
+            if isinstance(entity_id_ref, str) and entity_id_ref == entity_id:
+                return True
+            elif isinstance(entity_id_ref, list) and entity_id in entity_id_ref:
+                return True
+        
+        # Zone references (zones are entities)
+        zone_ref = condition.get("zone")
+        if zone_ref:
+            if isinstance(zone_ref, str) and zone_ref == entity_id:
+                return True
+            elif isinstance(zone_ref, list) and entity_id in zone_ref:
+                return True
+        
+        # Device references - check if entity belongs to this device
+        device_id = condition.get("device_id")
+        if device_id and self._entity_belongs_to_device(entity_id, device_id):
+            return True
+        
+        # Template conditions
+        value_template = condition.get("value_template")
+        if value_template and self._entity_referenced_in_template_string(entity_id, value_template):
+            return True
+        
+        # Logical conditions - recursively process nested conditions
+        if condition_type in ["and", "or", "not"]:
+            nested_conditions = condition.get("conditions", [])
+            if self._entity_referenced_in_conditions(entity_id, nested_conditions):
+                return True
+        
+        return False
+
+    def _entity_referenced_in_template_string(self, entity_id: str, template_str: str) -> bool:
+        """Check if entity is referenced in a Jinja2 template string."""
+        import re
+        
+        if not isinstance(template_str, str):
+            return False
+        
+        # Common template patterns for entity references
+        patterns = [
+            rf"states\(['\"]?{re.escape(entity_id)}['\"]?\)",           # states('entity.id')
+            rf"state_attr\(['\"]?{re.escape(entity_id)}['\"]?,",        # state_attr('entity.id', 'attr')
+            rf"is_state\(['\"]?{re.escape(entity_id)}['\"]?,",          # is_state('entity.id', 'state')
+            rf"states\.{re.escape(entity_id.replace('.', r'\.'))}",     # states.entity.id
+        ]
+        
+        for pattern in patterns:
+            if re.search(pattern, template_str):
+                return True
+        
+        # Simple containment check as fallback
+        return entity_id in template_str
+
+    def _entity_belongs_to_device(self, entity_id: str, device_id: str) -> bool:
+        """Check if an entity belongs to a specific device."""
+        entity_entry = self._entity_registry.async_get(entity_id)
+        return entity_entry and entity_entry.device_id == device_id
 
     def _entity_referenced_in_templates(self, entity_id: str, attributes: Dict[str, Any]) -> bool:
         """Check if entity is referenced in template attributes."""
