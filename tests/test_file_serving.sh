@@ -11,10 +11,10 @@ if [ -f "custom_components/ha_visualiser/www/ha-visualiser-panel.js" ]; then
     echo "   Modified: $(stat -f%Sm custom_components/ha_visualiser/www/ha-visualiser-panel.js 2>/dev/null || stat -c%y custom_components/ha_visualiser/www/ha-visualiser-panel.js)"
     
     # Check for version indicator
-    if grep -q "v0.1.1" custom_components/ha_visualiser/www/ha-visualiser-panel.js; then
-        echo "✓ File contains v0.1.1 version marker"
+    if grep -q "v0.4" custom_components/ha_visualiser/www/ha-visualiser-panel.js; then
+        echo "✓ File contains v0.4.x version marker"
     else
-        echo "✗ File missing v0.1.1 version marker"
+        echo "✗ File missing v0.4.x version marker"
     fi
     
     # Check for vis.js code
@@ -35,13 +35,13 @@ echo "  cp -rf custom_components/ha_visualiser/ /path/to/homeassistant/config/cu
 echo
 echo "Check copied file:"
 echo "  ls -la /path/to/homeassistant/config/custom_components/ha_visualiser/www/ha-visualiser-panel.js"
-echo "  grep 'v0.1.1' /path/to/homeassistant/config/custom_components/ha_visualiser/www/ha-visualiser-panel.js"
+echo "  grep 'v0.4' /path/to/homeassistant/config/custom_components/ha_visualiser/www/ha-visualiser-panel.js"
 echo
 echo "Restart HA and check URL directly in browser:"
 echo "  http://your-ha-url:8123/hacsfiles/ha_visualiser/ha-visualiser-panel.js"
 echo
 echo "In browser console, check for version:"
-echo "  Look for: 'HA Visualiser Panel v0.1.1: Connected callback started'"
+echo "  Look for: 'HA Visualiser Panel v0.4.x: [latest feature description]'"
 echo "  Look for: 'HA Visualiser Panel: Loading enhanced vis.js version'"
 echo
 echo "Clear browser cache:"

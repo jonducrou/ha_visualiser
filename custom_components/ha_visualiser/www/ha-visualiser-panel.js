@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.4.2: Fixed vis.js configuration errors');
+    console.log('HA Visualiser Panel v0.4.4: Fixed variable declaration conflict');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
@@ -378,6 +378,13 @@ class HaVisualiserPanel extends HTMLElement {
       return;
     }
     
+    // Detect if this is a complex graph that might benefit from force-directed layout
+    const nodes = graphData.nodes || [];
+    const edges = graphData.edges || [];
+    const isComplexGraph = edges.length > nodes.length * 1.5; // High edge-to-node ratio
+    
+    console.log(`HA Visualiser: Graph analysis - ${nodes.length} nodes, ${edges.length} edges, ratio: ${(edges.length / nodes.length).toFixed(2)}, using ${isComplexGraph ? 'force-directed' : 'hierarchical'} layout`);
+    
     const networkContainer = this.querySelector('#visNetwork');
     const graphInfo = this.querySelector('#graphInfo');
     
@@ -396,10 +403,7 @@ class HaVisualiserPanel extends HTMLElement {
       }
     }
     
-    const nodes = graphData.nodes || [];
-    const edges = graphData.edges || [];
-    
-    // Prepare vis.js data
+    // Prepare vis.js data (nodes and edges already declared above)
     const visNodes = new vis.DataSet(nodes.map(node => {
       const isFocusNode = node.id === graphData.center_node;
       const icon = this.getEntityIcon(node.domain);
@@ -441,30 +445,50 @@ class HaVisualiserPanel extends HTMLElement {
     
     const data = { nodes: visNodes, edges: visEdges };
 
-    const options = {
-      layout: {
-        improvedLayout: true,
-        hierarchical: {
-          direction: 'UD',        // Left to Right
-          sortMethod: 'directed', // Respects edge directions
-          edgeMinimization: true,    // Reduces edge crossings
-          blockShifting: true,       // Reduces whitespace and crossings
-          parentCentralization: true, // Centers parents over children
-          levelSeparation: 150,   // Horizontal spacing between levels
-          nodeSpacing: 100,       // Vertical spacing between nodes
-          treeSpacing: 200        // Spacing between separate trees
-        }
+    // Choose layout algorithm based on graph complexity
+    const layoutOptions = isComplexGraph ? {
+      // Force-directed layout for complex graphs
+      improvedLayout: true,
+      randomSeed: 42
+    } : {
+      // Hierarchical layout for simpler graphs
+      improvedLayout: true,
+      hierarchical: {
+        enabled: true,
+        direction: 'UD',
+        sortMethod: 'directed',
+        shakeTowards: 'leaves',        // Helps with edge crossing reduction
+        edgeMinimization: true,
+        blockShifting: true,
+        parentCentralization: true,
+        levelSeparation: 180,          // Increased for better clarity
+        nodeSpacing: 120,              // Increased spacing
+        treeSpacing: 250               // More space between trees
       },
+      randomSeed: 42                   // Consistent layouts
+    };
+
+    const options = {
+      layout: layoutOptions,
       physics: {
         enabled: true,
-        stabilization: { iterations: 100 },
+        solver: 'barnesHut',
+        stabilization: { 
+          iterations: 1000,              // More iterations for better stabilization
+          updateInterval: 100,
+          onlyDynamicEdges: false,
+          fit: true
+        },
         barnesHut: {
-          gravitationalConstant: -2000,
-          centralGravity: 0.3,
-          springLength: 95,
-          springConstant: 0.04,
-          damping: 0.09
-        }
+          gravitationalConstant: -3000,  // Stronger repulsion
+          centralGravity: 0.2,           // Reduced central gravity
+          springLength: 150,             // Longer springs for less crowding
+          springConstant: 0.05,
+          damping: 0.15,                 // More damping for stability
+          avoidOverlap: 0.5              // Prevent node overlap
+        },
+        maxVelocity: 30,                 // Slower movement for stability
+        minVelocity: 0.75                // Higher minimum for quicker settling
       },
       interaction: {
         hover: true,
@@ -495,8 +519,9 @@ class HaVisualiserPanel extends HTMLElement {
         width: 1.5,
         shadow: false,
         smooth: {
-          type: 'continuous',
-          roundness: 0.2
+          type: 'cubicBezier',           // Better curve algorithm
+          roundness: 0.6,                // More pronounced curves
+          forceDirection: 'vertical'     // Help with hierarchical layout
         },
         color: {
           color: '#D0D0D0',
@@ -506,9 +531,11 @@ class HaVisualiserPanel extends HTMLElement {
         arrows: {
           to: {
             enabled: true,
-            scaleFactor: 0.8
+            scaleFactor: 0.8,
+            type: 'arrow'
           }
-        }
+        },
+        length: 200                      // Preferred edge length
       }
     };
     
@@ -518,6 +545,14 @@ class HaVisualiserPanel extends HTMLElement {
     }
     
     this.network = new vis.Network(networkContainer, data, options);
+    
+    // Optimize layout after stabilization
+    this.network.on('stabilizationIterationsDone', () => {
+      console.log('HA Visualiser: Layout stabilized, disabling physics for performance');
+      this.network.setOptions({
+        physics: { enabled: false }
+      });
+    });
     
     // Add event listeners
     this.network.on('click', (params) => {
