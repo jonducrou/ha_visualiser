@@ -46,7 +46,7 @@ class GraphService:
     async def get_entity_neighborhood(
         self, entity_id: str, max_depth: int = 2
     ) -> Dict[str, Any]:
-        """Get the neighborhood graph for a specific entity, device, area, or zone."""
+        """Get the neighborhood graph for a specific entity, device, area, zone, or label."""
         
         # Handle device nodes
         if entity_id.startswith("device:"):
@@ -65,6 +65,12 @@ class GraphService:
             zone_state = self.hass.states.get(entity_id)
             if not zone_state:
                 raise ValueError(f"Zone {entity_id} not found")
+        # Handle label nodes
+        elif entity_id.startswith("label:"):
+            label_id = entity_id.replace("label:", "")
+            label_entry = self._label_registry.async_get_label(label_id)
+            if not label_entry:
+                raise ValueError(f"Label {label_id} not found")
         # Handle regular entities
         elif entity_id not in self.hass.states.async_entity_ids():
             raise ValueError(f"Entity {entity_id} not found")
@@ -216,6 +222,12 @@ class GraphService:
             zone_state = self.hass.states.get(entity_id)
             if not zone_state:
                 raise ValueError(f"Zone {entity_id} not found")
+        # Handle label nodes
+        elif entity_id.startswith("label:"):
+            label_id = entity_id.replace("label:", "")
+            label_entry = self._label_registry.async_get_label(label_id)
+            if not label_entry:
+                raise ValueError(f"Label {label_id} not found")
         # Handle regular entities
         elif entity_id not in self.hass.states.async_entity_ids():
             raise ValueError(f"Entity {entity_id} not found")
