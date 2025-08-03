@@ -61,3 +61,6 @@ venv.bak/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Home Assistant debug files
+home-assistant.log
