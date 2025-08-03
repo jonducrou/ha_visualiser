@@ -91,6 +91,45 @@ class GraphService:
             "center_node": entity_id
         }
 
+    def _get_entities_for_label(self, label_id: str) -> List[Any]:
+        """Get entities for a label with compatibility check."""
+        try:
+            # Manual approach - safe for all HA versions
+            result = []
+            for entity_entry in self._entity_registry.entities.values():
+                if hasattr(entity_entry, 'labels') and entity_entry.labels and label_id in entity_entry.labels:
+                    result.append(entity_entry)
+            return result
+        except Exception as e:
+            _LOGGER.debug(f"Error getting entities for label {label_id}: {e}")
+            return []
+    
+    def _get_devices_for_label(self, label_id: str) -> List[Any]:
+        """Get devices for a label with compatibility check."""
+        try:
+            # Manual approach - safe for all HA versions
+            result = []
+            for device in self._device_registry.devices.values():
+                if hasattr(device, 'labels') and device.labels and label_id in device.labels:
+                    result.append(device)
+            return result
+        except Exception as e:
+            _LOGGER.debug(f"Error getting devices for label {label_id}: {e}")
+            return []
+    
+    def _get_areas_for_label(self, label_id: str) -> List[Any]:
+        """Get areas for a label with compatibility check."""
+        try:
+            # Manual approach - safe for all HA versions
+            result = []
+            for area in self._area_registry.areas.values():
+                if hasattr(area, 'labels') and area.labels and label_id in area.labels:
+                    result.append(area)
+            return result
+        except Exception as e:
+            _LOGGER.debug(f"Error getting areas for label {label_id}: {e}")
+            return []
+
     async def search_entities(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
         """Search for entities and devices matching the query."""
         query_lower = query.lower()
@@ -178,9 +217,9 @@ class GraphService:
             for label_entry in self._label_registry.async_list_labels():
                 if query_lower in label_entry.name.lower():
                     # Count items with this label
-                    entity_count = len(entity_registry.async_entries_for_label(self._entity_registry, label_entry.label_id))
-                    device_count = len(device_registry.async_entries_for_label(self._device_registry, label_entry.label_id))
-                    area_count = len(area_registry.async_entries_for_label(self._area_registry, label_entry.label_id))
+                    entity_count = len(self._get_entities_for_label(label_entry.label_id))
+                    device_count = len(self._get_devices_for_label(label_entry.label_id))
+                    area_count = len(self._get_areas_for_label(label_entry.label_id))
                     total_count = entity_count + device_count + area_count
                     
                     results.append({
@@ -579,9 +618,9 @@ class GraphService:
                 return None
                 
             # Count how many entities/devices/areas have this label
-            entity_count = len(entity_registry.async_entries_for_label(self._entity_registry, label_id))
-            device_count = len(device_registry.async_entries_for_label(self._device_registry, label_id))
-            area_count = len(area_registry.async_entries_for_label(self._area_registry, label_id))
+            entity_count = len(self._get_entities_for_label(label_id))
+            device_count = len(self._get_devices_for_label(label_id))
+            area_count = len(self._get_areas_for_label(label_id))
             total_count = entity_count + device_count + area_count
             
             state_info = f"{total_count} items"
@@ -645,7 +684,6 @@ class GraphService:
             device_id = entity_id.replace("device:", "")
             _LOGGER.debug(f"Finding entities for device: {device_id}")
             
-            from homeassistant.helpers import entity_registry
             device_entities = entity_registry.async_entries_for_device(
                 self._entity_registry, device_id
             )
@@ -681,8 +719,6 @@ class GraphService:
         if entity_id.startswith("area:"):
             area_id = entity_id.replace("area:", "")
             _LOGGER.debug(f"Finding entities for area: {area_id}")
-            
-            from homeassistant.helpers import entity_registry
             
             # Find entities directly assigned to the area
             area_entities = entity_registry.async_entries_for_area(
@@ -768,7 +804,7 @@ class GraphService:
             label_entry = self._label_registry.async_get_label(label_id)
             if label_entry:
                 # Find all entities with this label
-                label_entities = entity_registry.async_entries_for_label(self._entity_registry, label_id)
+                label_entities = self._get_entities_for_label(label_id)
                 _LOGGER.debug(f"Found {len(label_entities)} entities with label {label_entry.name}")
                 for entity_entry in label_entities:
                     _LOGGER.debug(f"  Label entity: {entity_entry.entity_id}")
@@ -776,7 +812,7 @@ class GraphService:
                     related.append((entity_entry.entity_id, "labelled"))
                 
                 # Find all devices with this label
-                label_devices = device_registry.async_entries_for_label(self._device_registry, label_id)
+                label_devices = self._get_devices_for_label(label_id)
                 _LOGGER.debug(f"Found {len(label_devices)} devices with label {label_entry.name}")
                 for device in label_devices:
                     device_node_id = f"device:{device.id}"
@@ -785,7 +821,7 @@ class GraphService:
                     related.append((device_node_id, "labelled"))
                 
                 # Find all areas with this label
-                label_areas = area_registry.async_entries_for_label(self._area_registry, label_id)
+                label_areas = self._get_areas_for_label(label_id)
                 _LOGGER.debug(f"Found {len(label_areas)} areas with label {label_entry.name}")
                 for area in label_areas:
                     area_node_id = f"area:{area.id}"
@@ -1271,7 +1307,6 @@ class GraphService:
     def _get_entities_for_device(self, device_id: str) -> Set[str]:
         """Get all entity IDs for a given device."""
         try:
-            from homeassistant.helpers import entity_registry
             device_entities = entity_registry.async_entries_for_device(
                 self._entity_registry, device_id
             )
@@ -1282,7 +1317,6 @@ class GraphService:
     def _get_entities_for_area(self, area_id: str) -> Set[str]:
         """Get all entity IDs for a given area."""
         try:
-            from homeassistant.helpers import entity_registry
             area_entities = entity_registry.async_entries_for_area(
                 self._entity_registry, area_id
             )
@@ -1333,7 +1367,7 @@ class GraphService:
             related.append((label_node_id, "labelled"))
             
             # Find other entities with the same label (these will be connected via the label node)
-            related_entities = entity_registry.async_entries_for_label(self._entity_registry, label_id)
+            related_entities = self._get_entities_for_label(label_id)
             for related_entity in related_entities:
                 if related_entity.entity_id != entity_entry.entity_id:
                     # The relationship will be: current_entity -> label -> other_entity
@@ -1341,18 +1375,19 @@ class GraphService:
                     related.append((related_entity.entity_id, f"shares_label:{label_entry.name}"))
             
             # Find devices with the same label
-            related_devices = device_registry.async_entries_for_label(self._device_registry, label_id)
+            related_devices = self._get_devices_for_label(label_id)
             for device in related_devices:
                 device_node_id = f"device:{device.id}"
                 related.append((device_node_id, f"shares_label:{label_entry.name}"))
             
             # Find areas with the same label
-            related_areas = area_registry.async_entries_for_label(self._area_registry, label_id)
+            related_areas = self._get_areas_for_label(label_id)
             for area in related_areas:
                 area_node_id = f"area:{area.id}"
                 related.append((area_node_id, f"shares_label:{label_entry.name}"))
         
         return related
+
 
     def _entity_referenced_in_config(self, entity_id: str, config_list: List[Dict[str, Any]]) -> bool:
         """Check if entity is referenced in automation config."""
