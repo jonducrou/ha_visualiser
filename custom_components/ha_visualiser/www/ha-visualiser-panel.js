@@ -15,9 +15,9 @@ class HaVisualiserPanel extends HTMLElement {
       panel: { type: Object },
     };
   }
-
+ 
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.1.3: Connected callback started - Fixed node click navigation');
+    console.log('HA Visualiser Panel v0.3.2: Connected callback started - Fixed automation relationship symmetry');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
@@ -400,16 +400,24 @@ class HaVisualiserPanel extends HTMLElement {
     const edges = graphData.edges || [];
     
     // Prepare vis.js data
-    const visNodes = new vis.DataSet(nodes.map(node => ({
-      id: node.id,
-      label: node.label,
-      title: this.createNodeTooltip(node),
-      shape: this.getNodeShape(node.domain),
-      color: this.getNodeColor(node.domain),
-      font: { size: 12, color: '#333' },
-      borderWidth: node.id === graphData.center_node ? 3 : 1,
-      borderWidthSelected: 3
-    })));
+    const visNodes = new vis.DataSet(nodes.map(node => {
+      const isFocusNode = node.id === graphData.center_node;
+      return {
+        id: node.id,
+        label: node.label,
+        title: this.createNodeTooltip(node),
+        shape: this.getNodeShape(node.domain),
+        color: isFocusNode ? this.getFocusNodeColor(node.domain) : this.getNodeColor(node.domain),
+        font: { 
+          size: isFocusNode ? 14 : 12, 
+          color: isFocusNode ? '#000' : '#333',
+          bold: isFocusNode
+        },
+        borderWidth: isFocusNode ? 4 : 1,
+        borderWidthSelected: 4,
+        shadow: isFocusNode ? { enabled: true, size: 10, x: 0, y: 0 } : true
+      };
+    }));
     
     const visEdges = new vis.DataSet(edges.map(edge => ({
       from: edge.from_node,
@@ -422,11 +430,17 @@ class HaVisualiserPanel extends HTMLElement {
     })));
     
     const data = { nodes: visNodes, edges: visEdges };
-    
+
     const options = {
       layout: {
         improvedLayout: true,
-        hierarchical: false
+        hierarchical: {
+          direction: 'UD',        // Left to Right
+          sortMethod: 'directed', // Respects edge directions
+          levelSeparation: 150,   // Horizontal spacing between levels
+          nodeSpacing: 100,       // Vertical spacing between nodes
+          treeSpacing: 200        // Spacing between separate trees
+        }
       },
       physics: {
         enabled: true,
@@ -530,11 +544,21 @@ class HaVisualiserPanel extends HTMLElement {
   
   createNodeTooltip(node) {
     let tooltip = `<strong>${node.label}</strong><br/>`;
-    tooltip += `ID: ${node.id}<br/>`;
-    tooltip += `Domain: ${node.domain}<br/>`;
-    if (node.area) tooltip += `Area: ${node.area}<br/>`;
-    if (node.state) tooltip += `State: ${node.state}<br/>`;
-    if (node.device_id) tooltip += `Device: ${node.device_id}`;
+    
+    if (node.domain === 'device') {
+      tooltip += `Type: Device<br/>`;
+      tooltip += `ID: ${node.device_id}<br/>`;
+      if (node.area) tooltip += `Area: ${node.area}<br/>`;
+      tooltip += `Status: ${node.state}<br/>`;
+      tooltip += `Click to see entities`;
+    } else {
+      tooltip += `ID: ${node.id}<br/>`;
+      tooltip += `Domain: ${node.domain}<br/>`;
+      if (node.area) tooltip += `Area: ${node.area}<br/>`;
+      if (node.state) tooltip += `State: ${node.state}<br/>`;
+      if (node.device_id) tooltip += `Device: ${node.device_id}`;
+    }
+    
     return tooltip;
   }
   
@@ -549,7 +573,10 @@ class HaVisualiserPanel extends HTMLElement {
       'input_boolean': 'square',
       'input_number': 'box',
       'binary_sensor': 'triangle',
-      'device_tracker': 'dot'
+      'device_tracker': 'dot',
+      'device': 'database',
+      'area': 'box',
+      'zone': 'circle'
     };
     return shapes[domain] || 'ellipse';
   }
@@ -565,14 +592,40 @@ class HaVisualiserPanel extends HTMLElement {
       'input_boolean': '#26C6DA',
       'input_number': '#5C6BC0',
       'binary_sensor': '#78909C',
-      'device_tracker': '#FF7043'
+      'device_tracker': '#FF7043',
+      'device': '#795548',
+      'area': '#607D8B',
+      'zone': '#00BCD4'
     };
     return colors[domain] || '#90A4AE';
   }
   
+  getFocusNodeColor(domain) {
+    // Brighter, more prominent colors for the focus node
+    const focusColors = {
+      'light': '#FF8F00',        // Bright orange
+      'switch': '#4CAF50',       // Bright green
+      'sensor': '#2196F3',       // Bright blue
+      'automation': '#9C27B0',   // Bright purple
+      'script': '#F44336',       // Bright red
+      'scene': '#FFC107',        // Bright yellow
+      'input_boolean': '#00BCD4', // Bright cyan
+      'input_number': '#3F51B5',  // Bright indigo
+      'binary_sensor': '#607D8B', // Blue grey
+      'device_tracker': '#FF5722', // Deep orange
+      'device': '#5D4037',       // Brown
+      'area': '#455A64',         // Blue grey
+      'zone': '#00ACC1'          // Cyan
+    };
+    return focusColors[domain] || '#546E7A';
+  }
+  
   getEdgeColor(relationshipType) {
+    if (relationshipType === 'has_entity') return '#4CAF50';
+    if (relationshipType === 'in_zone') return '#00BCD4';
+    if (relationshipType.startsWith('belongs_to:')) return '#795548';
     if (relationshipType.startsWith('device:')) return '#4CAF50';
-    if (relationshipType.startsWith('area:')) return '#2196F3';
+    if (relationshipType.startsWith('area:')) return '#607D8B';
     if (relationshipType.startsWith('automation')) return '#9C27B0';
     if (relationshipType.startsWith('template:')) return '#FF9800';
     if (relationshipType.startsWith('triggers:')) return '#E91E63';
