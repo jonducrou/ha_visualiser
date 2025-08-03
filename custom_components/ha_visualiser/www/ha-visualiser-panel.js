@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.4.4: Fixed variable declaration conflict');
+    console.log('HA Visualiser Panel v0.5.0: Added label relationship support');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
@@ -624,6 +624,11 @@ class HaVisualiserPanel extends HTMLElement {
       if (node.area) tooltip += `Area: ${node.area}<br/>`;
       tooltip += `Status: ${node.state}<br/>`;
       tooltip += `Click to see entities`;
+    } else if (node.domain === 'label') {
+      tooltip += `Type: Label<br/>`;
+      tooltip += `ID: ${node.id}<br/>`;
+      tooltip += `Usage: ${node.state}<br/>`;
+      tooltip += `Click to see labelled items`;
     } else {
       tooltip += `ID: ${node.id}<br/>`;
       tooltip += `Domain: ${node.domain}<br/>`;
@@ -656,6 +661,7 @@ class HaVisualiserPanel extends HTMLElement {
       'device': '#F6F6F6',       // Light grey
       'area': '#F0F8F0',         // Very light green
       'zone': '#F0FDFD',         // Very light teal
+      'label': '#FFF8DC',        // Very light yellow (cornsilk)
       'media_player': '#FFF0F8',  // Very light pink
       'number': '#F8F5FF',       // Very light violet
       'todo': '#F5FFF0'          // Very light lime
@@ -679,6 +685,7 @@ class HaVisualiserPanel extends HTMLElement {
       'device': '#E8E8E8',       // Slightly darker grey
       'area': '#E1F0E1',         // Slightly darker light green
       'zone': '#E1F8F8',         // Slightly darker light teal
+      'label': '#FFF0B8',        // Slightly darker light yellow
       'media_player': '#FFE1F0',  // Slightly darker light pink
       'number': '#F0E8FF',       // Slightly darker light violet
       'todo': '#E8FFE1'          // Slightly darker light lime
@@ -702,6 +709,7 @@ class HaVisualiserPanel extends HTMLElement {
       'device': '📱',
       'area': '🏠',
       'zone': '📍',
+      'label': '🏷️',
       'media_player': '🔊',
       'number': '🔢',
       'todo': '✅',

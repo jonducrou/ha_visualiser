@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Set
 from dataclasses import dataclass
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry, entity_registry, area_registry
+from homeassistant.helpers import device_registry, entity_registry, area_registry, label_registry
 from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,6 +41,7 @@ class GraphService:
         self._entity_registry = entity_registry.async_get(hass)
         self._device_registry = device_registry.async_get(hass)
         self._area_registry = area_registry.async_get(hass)
+        self._label_registry = label_registry.async_get(hass)
 
     async def get_entity_neighborhood(
         self, entity_id: str, max_depth: int = 2
@@ -161,6 +162,26 @@ class GraphService:
                         "friendly_name": f"Zone: {zone_name}",
                         "domain": "zone",
                         "state": zone_state.state
+                    })
+                    
+                    if len(results) >= limit:
+                        break
+        
+        # Search labels if we have room for more results
+        if len(results) < limit:
+            for label_entry in self._label_registry.async_list_labels():
+                if query_lower in label_entry.name.lower():
+                    # Count items with this label
+                    entity_count = len(entity_registry.async_entries_for_label(self._entity_registry, label_entry.label_id))
+                    device_count = len(device_registry.async_entries_for_label(self._device_registry, label_entry.label_id))
+                    area_count = len(area_registry.async_entries_for_label(self._area_registry, label_entry.label_id))
+                    total_count = entity_count + device_count + area_count
+                    
+                    results.append({
+                        "entity_id": f"label:{label_entry.label_id}",
+                        "friendly_name": f"Label: {label_entry.name}",
+                        "domain": "label",
+                        "state": f"{total_count} items"
                     })
                     
                     if len(results) >= limit:
@@ -391,8 +412,10 @@ class GraphService:
         
         def get_node_priority(node_id: str) -> int:
             """Get priority for canonical edge ordering."""
-            if node_id.startswith("area:"):
-                return 1  # Highest priority - areas contain everything
+            if node_id.startswith("label:"):
+                return 0  # Highest priority - labels label everything
+            elif node_id.startswith("area:"):
+                return 1  # Areas contain everything
             elif node_id.startswith("device:"):
                 return 2  # Devices contain entities
             elif node_id.startswith("zone."):
@@ -402,9 +425,9 @@ class GraphService:
             else:
                 return 5  # Regular entities
         
-        # Standard containment relationships - always container -> contained
+        # Standard containment and labelling relationships - always container/label -> contained/labelled
         if relationship_type in ["has_entity", "device_has", "area_contains", "area_contains_device", 
-                                "device_in_area", "zone_contains", "in_zone"]:
+                                "device_in_area", "zone_contains", "in_zone", "labelled"]:
             
             priority_a = get_node_priority(node_a)
             priority_b = get_node_priority(node_b)
@@ -416,7 +439,9 @@ class GraphService:
                 from_node, to_node = node_b, node_a
                 
             # Determine label based on container type
-            if from_node.startswith("area:"):
+            if from_node.startswith("label:"):
+                label = "labelled"
+            elif from_node.startswith("area:"):
                 label = "contains"
             elif from_node.startswith("device:"):
                 label = "has entity"
@@ -447,6 +472,14 @@ class GraphService:
             # For now, assume template relationships point from template to entity
             from_node, to_node = node_a, node_b
             label = "uses"
+            
+        elif relationship_type == "labelled" or relationship_type.startswith("shares_label:"):
+            # Label -> Object (Label labels Object)
+            if node_a.startswith("label:"):
+                from_node, to_node = node_a, node_b  # label -> object
+            else:
+                from_node, to_node = node_b, node_a  # label -> object
+            label = "labelled"
             
         else:
             # Default: use node priority to determine direction
@@ -526,6 +559,37 @@ class GraphService:
                 state=zone_state.state
             )
         
+        # Handle label nodes
+        if entity_id.startswith("label:"):
+            label_id = entity_id.replace("label:", "")
+            label_entry = self._label_registry.async_get_label(label_id)
+            if not label_entry:
+                return None
+                
+            # Count how many entities/devices/areas have this label
+            entity_count = len(entity_registry.async_entries_for_label(self._entity_registry, label_id))
+            device_count = len(device_registry.async_entries_for_label(self._device_registry, label_id))
+            area_count = len(area_registry.async_entries_for_label(self._area_registry, label_id))
+            total_count = entity_count + device_count + area_count
+            
+            state_info = f"{total_count} items"
+            if entity_count > 0:
+                state_info += f" ({entity_count} entities"
+                if device_count > 0:
+                    state_info += f", {device_count} devices"
+                if area_count > 0:
+                    state_info += f", {area_count} areas"
+                state_info += ")"
+            
+            return GraphNode(
+                id=entity_id,
+                label=label_entry.name,
+                domain="label",
+                area=None,
+                device_id=None,
+                state=state_info
+            )
+        
         # Handle regular entity nodes
         state = self.hass.states.get(entity_id)
         if not state:
@@ -590,6 +654,15 @@ class GraphService:
                 # Area contains device: return area with device_in_area relationship
                 related.append((area_node_id, "device_in_area"))
             
+            # Add label relationships for device
+            device = self._device_registry.async_get(device_id)
+            if device and device.labels:
+                for label_id in device.labels:
+                    label_entry = self._label_registry.async_get_label(label_id)
+                    if label_entry:
+                        label_node_id = f"label:{label_id}"
+                        related.append((label_node_id, "labelled"))
+            
             return related
         
         # Handle area node relationships - show all entities in the area
@@ -633,6 +706,15 @@ class GraphService:
                     # Area contains entity (via device): return entity with area_contains relationship
                     related.append((entity_entry.entity_id, "area_contains"))
             
+            # Add label relationships for area
+            area = self._area_registry.async_get_area(area_id)
+            if area and area.labels:
+                for label_id in area.labels:
+                    label_entry = self._label_registry.async_get_label(label_id)
+                    if label_entry:
+                        label_node_id = f"label:{label_id}"
+                        related.append((label_node_id, "labelled"))
+            
             return related
         
         # Handle zone node relationships - show all entities in the zone
@@ -666,6 +748,41 @@ class GraphService:
             
             return related
         
+        # Handle label node relationships - show all entities/devices/areas with this label
+        if entity_id.startswith("label:"):
+            label_id = entity_id.replace("label:", "")
+            _LOGGER.debug(f"Finding items with label: {label_id}")
+            
+            label_entry = self._label_registry.async_get_label(label_id)
+            if label_entry:
+                # Find all entities with this label
+                label_entities = entity_registry.async_entries_for_label(self._entity_registry, label_id)
+                _LOGGER.debug(f"Found {len(label_entities)} entities with label {label_entry.name}")
+                for entity_entry in label_entities:
+                    _LOGGER.debug(f"  Label entity: {entity_entry.entity_id}")
+                    # Label labels entity: return entity with labelled relationship
+                    related.append((entity_entry.entity_id, "labelled"))
+                
+                # Find all devices with this label
+                label_devices = device_registry.async_entries_for_label(self._device_registry, label_id)
+                _LOGGER.debug(f"Found {len(label_devices)} devices with label {label_entry.name}")
+                for device in label_devices:
+                    device_node_id = f"device:{device.id}"
+                    _LOGGER.debug(f"  Label device: {device_node_id}")
+                    # Label labels device: return device with labelled relationship
+                    related.append((device_node_id, "labelled"))
+                
+                # Find all areas with this label
+                label_areas = area_registry.async_entries_for_label(self._area_registry, label_id)
+                _LOGGER.debug(f"Found {len(label_areas)} areas with label {label_entry.name}")
+                for area in label_areas:
+                    area_node_id = f"area:{area.id}"
+                    _LOGGER.debug(f"  Label area: {area_node_id}")
+                    # Label labels area: return area with labelled relationship
+                    related.append((area_node_id, "labelled"))
+            
+            return related
+        
         # Automation-based relationships (do this for ALL entities, including automations)
         automation_related = await self._find_automation_relationships(entity_id)
         related.extend(automation_related)
@@ -689,6 +806,10 @@ class GraphService:
             # Template-based relationships
             template_related = await self._find_template_relationships(entity_id)
             related.extend(template_related)
+            
+            # Label-based relationships
+            label_related = await self._find_label_relationships(entity_entry)
+            related.extend(label_related)
         
         return related
 
@@ -1179,6 +1300,45 @@ class GraphService:
                 if self._entity_referenced_in_templates(entity_id, state.attributes):
                     template_name = state.attributes.get("friendly_name", template_entity_id)
                     related.append((template_entity_id, f"template:{template_name}"))
+        
+        return related
+
+    async def _find_label_relationships(self, entity_entry) -> List[tuple[str, str]]:
+        """Find entities related through shared labels."""
+        related = []
+        
+        if not entity_entry or not entity_entry.labels:
+            return related
+        
+        # For each label on this entity
+        for label_id in entity_entry.labels:
+            label_entry = self._label_registry.async_get_label(label_id)
+            if not label_entry:
+                continue
+            
+            # Create a label node to show in the graph
+            label_node_id = f"label:{label_id}"
+            related.append((label_node_id, "labelled"))
+            
+            # Find other entities with the same label (these will be connected via the label node)
+            related_entities = entity_registry.async_entries_for_label(self._entity_registry, label_id)
+            for related_entity in related_entities:
+                if related_entity.entity_id != entity_entry.entity_id:
+                    # The relationship will be: current_entity -> label -> other_entity
+                    # This creates the reverse relationship for symmetrical navigation
+                    related.append((related_entity.entity_id, f"shares_label:{label_entry.name}"))
+            
+            # Find devices with the same label
+            related_devices = device_registry.async_entries_for_label(self._device_registry, label_id)
+            for device in related_devices:
+                device_node_id = f"device:{device.id}"
+                related.append((device_node_id, f"shares_label:{label_entry.name}"))
+            
+            # Find areas with the same label
+            related_areas = area_registry.async_entries_for_label(self._area_registry, label_id)
+            for area in related_areas:
+                area_node_id = f"area:{area.id}"
+                related.append((area_node_id, f"shares_label:{label_entry.name}"))
         
         return related
 
