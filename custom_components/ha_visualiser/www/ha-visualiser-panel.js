@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.6.1: Fixed depth consistency with distance-based traversal');
+    console.log('HA Visualiser Panel v0.6.2: Added group relationship detection and filtering');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
@@ -739,7 +739,8 @@ class HaVisualiserPanel extends HTMLElement {
       'label': '#FFF8DC',        // Very light yellow (cornsilk)
       'media_player': '#FFF0F8',  // Very light pink
       'number': '#F8F5FF',       // Very light violet
-      'todo': '#F5FFF0'          // Very light lime
+      'todo': '#F5FFF0',         // Very light lime
+      'group': '#F8F8FF'         // Very light lavender
     };
     return colors[domain] || '#F8F9FA';
   }
@@ -763,7 +764,8 @@ class HaVisualiserPanel extends HTMLElement {
       'label': '#FFF0B8',        // Slightly darker light yellow
       'media_player': '#FFE1F0',  // Slightly darker light pink
       'number': '#F0E8FF',       // Slightly darker light violet
-      'todo': '#E8FFE1'          // Slightly darker light lime
+      'todo': '#E8FFE1',         // Slightly darker light lime
+      'group': '#F0F0FF'         // Slightly darker light lavender
     };
     return focusColors[domain] || '#F0F1F2';
   }
@@ -889,7 +891,8 @@ class HaVisualiserPanel extends HTMLElement {
       'humidifier': '💧',
       'siren': '🚨',
       'update': '🔄',
-      'calendar': '📅'
+      'calendar': '📅',
+      'group': '👥'
     };
     return icons[domain] || '⚫';
   }
@@ -901,6 +904,9 @@ class HaVisualiserPanel extends HTMLElement {
     }
     if (relationshipType.includes('area') || relationshipType.includes('contains') || relationshipType.includes('device')) {
       return '#C0C0C0';  // Slightly lighter grey for containment relationships
+    }
+    if (relationshipType.includes('group')) {
+      return '#B8B8B8';  // Medium grey for group relationships
     }
     return '#D0D0D0';    // Very light grey for other relationships
   }

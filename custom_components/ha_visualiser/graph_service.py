@@ -148,10 +148,19 @@ class GraphService:
             if (query_lower in entity_id.lower() or 
                 query_lower in friendly_name.lower()):
                 
+                # For groups, check if they have any relationships before including
+                domain = entity_id.split(".")[0]
+                if domain == "group":
+                    # Check if group has any member entities
+                    member_entities = state.attributes.get("entity_id", [])
+                    if not member_entities:
+                        _LOGGER.debug(f"Excluding empty group from search: {entity_id}")
+                        continue  # Skip groups with no members
+                
                 results.append({
                     "entity_id": entity_id,
                     "friendly_name": friendly_name,
-                    "domain": entity_id.split(".")[0],
+                    "domain": domain,
                     "state": state.state
                 })
                 
@@ -953,6 +962,23 @@ class GraphService:
             
             return related
         
+        # Handle group node relationships - show all entities in the group
+        if entity_id.startswith("group."):
+            _LOGGER.debug(f"Finding entities for group: {entity_id}")
+            
+            group_state = self.hass.states.get(entity_id)
+            if group_state:
+                # Groups have an 'entity_id' attribute containing member entity IDs
+                member_entities = group_state.attributes.get("entity_id", [])
+                _LOGGER.debug(f"Found {len(member_entities)} entities in group {entity_id}")
+                
+                for member_entity_id in member_entities:
+                    _LOGGER.debug(f"  Group member: {member_entity_id}")
+                    # Group contains entity: return entity with group_contains relationship
+                    related.append((member_entity_id, "group_contains"))
+            
+            return related
+        
         # Handle label node relationships - show all entities/devices/areas with this label
         if entity_id.startswith("label:"):
             label_id = entity_id.replace("label:", "")
@@ -1019,6 +1045,10 @@ class GraphService:
             # Label-based relationships
             label_related = await self._find_label_relationships(entity_entry)
             related.extend(label_related)
+            
+            # Group-based relationships - find groups that contain this entity
+            group_related = await self._find_group_relationships(entity_id)
+            related.extend(group_related)
         
         return related
 
@@ -1879,6 +1909,33 @@ class GraphService:
         
         return related
 
+    async def _find_group_relationships(self, entity_id: str) -> List[tuple[str, str]]:
+        """Find groups that contain this entity."""
+        related = []
+        
+        _LOGGER.debug(f"Finding groups containing entity: {entity_id}")
+        
+        # Find all group entities and check if they contain this entity
+        group_entities = [
+            eid for eid in self.hass.states.async_entity_ids() 
+            if eid.startswith("group.")
+        ]
+        
+        for group_id in group_entities:
+            group_state = self.hass.states.get(group_id)
+            if not group_state:
+                continue
+                
+            # Groups have an 'entity_id' attribute containing member entity IDs
+            member_entities = group_state.attributes.get("entity_id", [])
+            
+            if entity_id in member_entities:
+                _LOGGER.debug(f"Found entity {entity_id} in group {group_id}")
+                # Entity is in group: return group with group_contains relationship
+                related.append((group_id, "group_contains"))
+        
+        _LOGGER.debug(f"Found {len(related)} groups containing entity {entity_id}")
+        return related
 
     def _entity_referenced_in_config(self, entity_id: str, config_list: List[Dict[str, Any]]) -> bool:
         """Check if entity is referenced in automation config."""
