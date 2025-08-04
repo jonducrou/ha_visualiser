@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.6.0: Configurable depth entity relationship visualization');
+    console.log('HA Visualiser Panel v0.6.1: Fixed depth consistency with distance-based traversal');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
@@ -448,7 +448,7 @@ class HaVisualiserPanel extends HTMLElement {
     // Detect if this is a complex graph that might benefit from force-directed layout
     const nodes = graphData.nodes || [];
     const edges = graphData.edges || [];
-    const isComplexGraph = edges.length > nodes.length * 1.5; // High edge-to-node ratio
+    const isComplexGraph = false; //edges.length > nodes.length * 1.5; // High edge-to-node ratio
     
     console.log(`HA Visualiser: Graph analysis - ${nodes.length} nodes, ${edges.length} edges, ratio: ${(edges.length / nodes.length).toFixed(2)}, using ${isComplexGraph ? 'force-directed' : 'hierarchical'} layout`);
     

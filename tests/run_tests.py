@@ -107,8 +107,8 @@ class TestRunner:
         manifest_path = self.project_root / "custom_components/ha_visualiser/manifest.json"
         if manifest_path.exists():
             content = manifest_path.read_text()
-            version_correct = '"version": "0.6.0"' in content
-            self.log_test("Version 0.6.0 in manifest", version_correct)
+            version_correct = '"version": "0.6.1"' in content
+            self.log_test("Version 0.6.1 in manifest", version_correct)
         
         # Test depth defaults
         graph_service_path = self.project_root / "custom_components/ha_visualiser/graph_service.py"
@@ -120,6 +120,14 @@ class TestRunner:
             # Test conditional relationship fix
             condition_fix = "Entity -> Automation (Entity is used in Automation condition)" in content
             self.log_test("Conditional relationship direction fixed", condition_fix)
+            
+            # Test depth consistency fix
+            depth_consistency_fix = "# Always add the entity as a node (even if already visited for neighbor exploration)" in content
+            self.log_test("Depth consistency fix applied", depth_consistency_fix)
+            
+            # Test distance-based algorithm implementation
+            distance_based_algorithm = "_add_entity_and_neighbors_with_distance" in content and "distances: Dict[str, int]" in content
+            self.log_test("Distance-based traversal algorithm implemented", distance_based_algorithm)
         
         # Test frontend changes
         frontend_path = self.project_root / "custom_components/ha_visualiser/www/ha-visualiser-panel.js"
@@ -137,6 +145,7 @@ class TestRunner:
             
             canvas_expansion = "calc(100vh - 32px)" in content
             self.log_test("Canvas expanded to full height", canvas_expansion)
+            
     
     async def test_graph_service_basics(self):
         """Test basic graph service functionality without HA dependencies."""

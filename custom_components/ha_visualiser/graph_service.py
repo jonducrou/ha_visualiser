@@ -78,12 +78,12 @@ class GraphService:
 
         nodes = {}
         edges = []
-        visited = set()
+        distances = {}  # Track minimum distance to each node
         edge_set = set()  # Track edges to prevent duplicates
         
         # Start with the target entity or device
-        await self._add_entity_and_neighbors(
-            entity_id, nodes, edges, visited, edge_set, max_depth
+        await self._add_entity_and_neighbors_with_distance(
+            entity_id, nodes, edges, distances, edge_set, max_depth, 0
         )
         
         return {
@@ -349,50 +349,48 @@ class GraphService:
         filtered_count: int = 0
     ) -> int:
         """Recursively add entity and its neighbors with filtering."""
-        if entity_id in visited or depth < 0:
+        if depth < 0:
+            return filtered_count
+            
+        # Always try to add the entity as a node if it passes filters (even if already visited for neighbor exploration)
+        if entity_id not in nodes:
+            node = await self._create_node(entity_id)
+            if node and self._passes_filters(node, domain_filter, area_filter):
+                nodes[entity_id] = node
+            elif node:  # Node exists but filtered out
+                filtered_count += 1
+            
+        # Only explore neighbors if we haven't visited this entity yet and depth allows
+        if entity_id in visited or depth <= 0:
             return filtered_count
             
         visited.add(entity_id)
         
-        # Add the entity as a node if it passes filters
-        node = await self._create_node(entity_id)
-        if node and self._passes_filters(node, domain_filter, area_filter):
-            nodes[entity_id] = node
-            
-            if depth > 0:
-                # Find and add related entities
-                related_entities = await self._find_related_entities(entity_id)
+        # Find and add related entities
+        related_entities = await self._find_related_entities(entity_id)
+        
+        for related_id, relationship_type in related_entities:
+            # Apply relationship filter
+            if relationship_filter and not any(
+                rel_filter in relationship_type for rel_filter in relationship_filter
+            ):
+                filtered_count += 1
+                continue
                 
-                for related_id, relationship_type in related_entities:
-                    # Apply relationship filter
-                    if relationship_filter and not any(
-                        rel_filter in relationship_type for rel_filter in relationship_filter
-                    ):
-                        filtered_count += 1
-                        continue
-                        
-                    if related_id not in visited:
-                        # Check if related entity passes filters
-                        related_node = await self._create_node(related_id)
-                        if related_node and self._passes_filters(related_node, domain_filter, area_filter):
-                            # Use centralized edge creation for consistent directions
-                            edge = self._create_symmetrical_edge(entity_id, related_id, relationship_type)
-                            if edge:
-                                # Create unique edge identifier for deduplication
-                                edge_key = f"{edge.from_node}:{edge.to_node}:{edge.relationship_type}"
-                                if edge_key not in edge_set:
-                                    edges.append(edge)
-                                    edge_set.add(edge_key)
-                            
-                            # Recursively add neighbor
-                            filtered_count = await self._add_entity_and_neighbors_filtered(
-                                related_id, nodes, edges, visited, edge_set, depth - 1,
-                                domain_filter, area_filter, relationship_filter, filtered_count
-                            )
-                        else:
-                            filtered_count += 1
-        else:
-            filtered_count += 1
+            # Create edge between current entity and related entity
+            edge = self._create_symmetrical_edge(entity_id, related_id, relationship_type)
+            if edge:
+                # Create unique edge identifier for deduplication
+                edge_key = f"{edge.from_node}:{edge.to_node}:{edge.relationship_type}"
+                if edge_key not in edge_set:
+                    edges.append(edge)
+                    edge_set.add(edge_key)
+            
+            # Recursively add neighbor (this will add the node even if depth-1 is 0)
+            filtered_count = await self._add_entity_and_neighbors_filtered(
+                related_id, nodes, edges, visited, edge_set, depth - 1,
+                domain_filter, area_filter, relationship_filter, filtered_count
+            )
             
         return filtered_count
 
@@ -411,6 +409,56 @@ class GraphService:
             
         return True
 
+    async def _add_entity_and_neighbors_with_distance(
+        self, 
+        entity_id: str, 
+        nodes: Dict[str, GraphNode], 
+        edges: List[GraphEdge], 
+        distances: Dict[str, int],
+        edge_set: Set[str],
+        max_depth: int,
+        current_distance: int
+    ) -> None:
+        """Recursively add entity and its neighbors using distance-based traversal."""
+        # Skip if we're beyond max depth
+        if current_distance > max_depth:
+            return
+            
+        # Always add the entity as a node
+        if entity_id not in nodes:
+            node = await self._create_node(entity_id)
+            if node:
+                nodes[entity_id] = node
+        
+        # Update distance if we found a shorter path, or if this is the first time we see this entity
+        if entity_id not in distances or current_distance < distances[entity_id]:
+            distances[entity_id] = current_distance
+        else:
+            # We've already processed this entity from a shorter or equal distance, skip neighbor exploration
+            return
+        
+        # Don't explore neighbors if we're at max depth
+        if current_distance >= max_depth:
+            return
+        
+        # Find and add related entities
+        related_entities = await self._find_related_entities(entity_id)
+        
+        for related_id, relationship_type in related_entities:
+            # Create edge between current entity and related entity
+            edge = self._create_symmetrical_edge(entity_id, related_id, relationship_type)
+            if edge:
+                # Create unique edge identifier for deduplication
+                edge_key = f"{edge.from_node}:{edge.to_node}:{edge.relationship_type}"
+                if edge_key not in edge_set:
+                    edges.append(edge)
+                    edge_set.add(edge_key)
+            
+            # Recursively add neighbor with increased distance
+            await self._add_entity_and_neighbors_with_distance(
+                related_id, nodes, edges, distances, edge_set, max_depth, current_distance + 1
+            )
+    
     async def _add_entity_and_neighbors(
         self, 
         entity_id: str, 
@@ -420,36 +468,39 @@ class GraphService:
         edge_set: Set[str],
         depth: int
     ) -> None:
-        """Recursively add entity and its neighbors to the graph."""
-        if entity_id in visited or depth < 0:
+        """Recursively add entity and its neighbors to the graph (legacy method for filtered version)."""
+        if depth < 0:
+            return
+            
+        # Always add the entity as a node (even if already visited for neighbor exploration)
+        if entity_id not in nodes:
+            node = await self._create_node(entity_id)
+            if node:
+                nodes[entity_id] = node
+        
+        # Only explore neighbors if we haven't visited this entity yet and depth allows
+        if entity_id in visited or depth <= 0:
             return
             
         visited.add(entity_id)
         
-        # Add the entity as a node
-        node = await self._create_node(entity_id)
-        if node:
-            nodes[entity_id] = node
+        # Find and add related entities
+        related_entities = await self._find_related_entities(entity_id)
+        
+        for related_id, relationship_type in related_entities:
+            # Create edge between current entity and related entity
+            edge = self._create_symmetrical_edge(entity_id, related_id, relationship_type)
+            if edge:
+                # Create unique edge identifier for deduplication
+                edge_key = f"{edge.from_node}:{edge.to_node}:{edge.relationship_type}"
+                if edge_key not in edge_set:
+                    edges.append(edge)
+                    edge_set.add(edge_key)
             
-            if depth > 0:
-                # Find and add related entities
-                related_entities = await self._find_related_entities(entity_id)
-                
-                for related_id, relationship_type in related_entities:
-                    if related_id not in visited:
-                        # Use centralized edge creation for consistent directions
-                        edge = self._create_symmetrical_edge(entity_id, related_id, relationship_type)
-                        if edge:
-                            # Create unique edge identifier for deduplication
-                            edge_key = f"{edge.from_node}:{edge.to_node}:{edge.relationship_type}"
-                            if edge_key not in edge_set:
-                                edges.append(edge)
-                                edge_set.add(edge_key)
-                        
-                        # Recursively add neighbor
-                        await self._add_entity_and_neighbors(
-                            related_id, nodes, edges, visited, edge_set, depth - 1
-                        )
+            # Recursively add neighbor (this will add the node even if depth-1 is 0)
+            await self._add_entity_and_neighbors(
+                related_id, nodes, edges, visited, edge_set, depth - 1
+            )
     
     def _create_symmetrical_edge(self, node_a: str, node_b: str, relationship_type: str) -> GraphEdge | None:
         """Create a symmetrical edge with consistent direction regardless of discovery order.
