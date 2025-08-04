@@ -45,7 +45,7 @@ class GraphService:
         self._label_registry = label_registry.async_get(hass)
 
     async def get_entity_neighborhood(
-        self, entity_id: str, max_depth: int = 2
+        self, entity_id: str, max_depth: int = 3
     ) -> Dict[str, Any]:
         """Get the neighborhood graph for a specific entity, device, area, zone, or label."""
         
@@ -238,7 +238,7 @@ class GraphService:
     async def get_filtered_neighborhood(
         self, 
         entity_id: str, 
-        max_depth: int = 2,
+        max_depth: int = 3,
         domain_filter: List[str] = None,
         area_filter: List[str] = None,
         relationship_filter: List[str] = None
@@ -522,12 +522,12 @@ class GraphService:
             label = "controls"
             
         elif relationship_type == "automation_condition":
-            # Automation -> Entity (Automation is conditional on Entity)
+            # Entity -> Automation (Entity is used in Automation condition)
             if node_a.startswith("automation."):
-                from_node, to_node = node_a, node_b  # automation -> entity
+                from_node, to_node = node_b, node_a  # entity -> automation
             else:
-                from_node, to_node = node_b, node_a  # automation -> entity
-            label = "conditional on"
+                from_node, to_node = node_a, node_b  # entity -> automation
+            label = "conditions"
             
         # Script relationships have same semantics as automations
         elif relationship_type == "script_trigger":
@@ -547,12 +547,12 @@ class GraphService:
             label = "controls"
             
         elif relationship_type == "script_condition":
-            # Script -> Entity (Script is conditional on Entity)
+            # Entity -> Script (Entity is used in Script condition)
             if node_a.startswith("script."):
-                from_node, to_node = node_a, node_b  # script -> entity
+                from_node, to_node = node_b, node_a  # entity -> script
             else:
-                from_node, to_node = node_b, node_a  # script -> entity
-            label = "conditional on"
+                from_node, to_node = node_a, node_b  # entity -> script
+            label = "conditions"
             
         elif relationship_type.startswith("template:"):
             # Template -> Entity (Template uses Entity)
@@ -1493,7 +1493,7 @@ class GraphService:
         for entity_id in condition_entities:
             if entity_id != automation_id and (entity_id, "automation_trigger") not in related and (entity_id, "automation_action") not in related:
                 related.append((entity_id, "automation_condition"))
-                _LOGGER.debug(f"Added condition relationship: {automation_name} conditional on {entity_id}")
+                _LOGGER.debug(f"Added condition relationship: {entity_id} conditions {automation_name}")
         
         _LOGGER.debug(f"Total entities found for {automation_name}: {len(related)}")
         return related

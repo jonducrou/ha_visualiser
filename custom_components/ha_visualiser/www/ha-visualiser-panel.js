@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.5.2: Clean entity relationship visualization');
+    console.log('HA Visualiser Panel v0.6.0: Configurable depth entity relationship visualization');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
@@ -47,6 +47,9 @@ class HaVisualiserPanel extends HTMLElement {
           padding: 16px;
           max-width: 1200px;
           margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          height: calc(100vh - 32px);
         }
         
         .search-section {
@@ -55,10 +58,19 @@ class HaVisualiserPanel extends HTMLElement {
           background: var(--card-background-color);
           border-radius: 8px;
           box-shadow: var(--ha-card-box-shadow);
+          display: flex;
+          align-items: flex-start;
+          gap: 16px;
+        }
+        
+        .search-container {
+          flex: 0 1 70%;
+          max-width: 400px;
+          position: relative;
         }
         
         .search-input {
-          width: 100%;
+          width: 90%;
           padding: 12px;
           border: 1px solid var(--divider-color);
           border-radius: 4px;
@@ -112,7 +124,8 @@ class HaVisualiserPanel extends HTMLElement {
           background: var(--card-background-color);
           border-radius: 8px;
           box-shadow: var(--ha-card-box-shadow);
-          height: 600px;
+          flex: 1;
+          min-height: 600px;
           position: relative;
         }
         
@@ -140,16 +153,52 @@ class HaVisualiserPanel extends HTMLElement {
         
         .control-button {
           padding: 8px 12px;
-          background: var(--primary-color);
-          color: var(--text-primary-color);
+          background: var(--primary-color, #0369a1);
+          color: var(--text-primary-color, white);
           border: none;
           border-radius: 4px;
           cursor: pointer;
           font-size: 12px;
+          transition: all 0.2s ease;
         }
         
         .control-button:hover {
-          background: var(--primary-color-dark);
+          background: var(--primary-color, #0369a1);
+          opacity: 0.8;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .control-button:active {
+          transform: translateY(0);
+          opacity: 0.9;
+        }
+        
+        .depth-control {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+          margin-top: 2px;
+          flex-shrink: 0;
+          min-width: 140px;
+        }
+        
+        .depth-control label {
+          margin: 0;
+          font-weight: 500;
+          color: var(--primary-text-color);
+          font-size: 14px;
+        }
+        
+        .depth-control select {
+          padding: 8px 12px;
+          border: 1px solid var(--divider-color);
+          border-radius: 4px;
+          background: var(--primary-background-color);
+          color: var(--primary-text-color);
+          font-size: 14px;
+          min-width: 100px;
         }
         
         .graph-info {
@@ -172,15 +221,6 @@ class HaVisualiserPanel extends HTMLElement {
           color: var(--secondary-text-color);
         }
         
-        .no-selection {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100%;
-          color: var(--secondary-text-color);
-          text-align: center;
-        }
-        
         .error {
           display: flex;
           align-items: center;
@@ -193,13 +233,25 @@ class HaVisualiserPanel extends HTMLElement {
       
       <div class="container">
         <div class="search-section">
-          <input 
-            type="text" 
-            class="search-input" 
-            placeholder="Search for entities..." 
-            id="entitySearch"
-          />
-          <div class="search-results" id="searchResults" style="display: none;"></div>
+          <div class="search-container">
+            <input 
+              type="text" 
+              class="search-input" 
+              placeholder="Search for entities..." 
+              id="entitySearch"
+            />
+            <div class="search-results" id="searchResults" style="display: none;"></div>
+          </div>
+          <div class="depth-control">
+            <label for="depthSelect">Depth:</label>
+            <select id="depthSelect">
+              <option value="1">1 Level</option>
+              <option value="2">2 Levels</option>
+              <option value="3" selected>3 Levels</option>
+              <option value="4">4 Levels</option>
+              <option value="5">5 Levels</option>
+            </select>
+          </div>
         </div>
         
         <div class="graph-section">
@@ -213,18 +265,12 @@ class HaVisualiserPanel extends HTMLElement {
               Select an entity to see its relationships
             </div>
           </div>
-            <div class="no-selection">
-              <div>
-                <h3>Entity Visualizer</h3>
-                <p>Search for an entity above to visualize its relationships</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     `;
 
     this.setupSearchEventListeners();
+    this.setupDepthControl();
   }
 
   setupSearchEventListeners() {
@@ -255,6 +301,18 @@ class HaVisualiserPanel extends HTMLElement {
     });
   }
 
+  setupDepthControl() {
+    const depthSelect = this.querySelector('#depthSelect');
+    
+    if (depthSelect) {
+      depthSelect.addEventListener('change', () => {
+        // If we have a current entity selected, refresh the graph with new depth
+        if (this.currentEntityId) {
+          this.selectEntity(this.currentEntityId);
+        }
+      });
+    }
+  }
 
   async searchEntities(query) {
     console.log('HA Visualiser: Searching for entities with query:', query);
@@ -330,6 +388,9 @@ class HaVisualiserPanel extends HTMLElement {
   }
 
   async selectEntity(entityId) {
+    // Store current entity for depth changes
+    this.currentEntityId = entityId;
+    
     const graphInfo = this.querySelector('#graphInfo');
     if (graphInfo) {
       graphInfo.textContent = 'Loading graph...';
@@ -340,10 +401,15 @@ class HaVisualiserPanel extends HTMLElement {
       this.network.setData({ nodes: new vis.DataSet(), edges: new vis.DataSet() });
     }
     
+    // Get selected depth
+    const depthSelect = this.querySelector('#depthSelect');
+    const maxDepth = depthSelect ? parseInt(depthSelect.value) : 3;
+    
     try {
       const graphData = await this.hass.callWS({
         type: 'ha_visualiser/get_neighborhood',
-        entity_id: entityId
+        entity_id: entityId,
+        max_depth: maxDepth
       });
       
       this.renderGraph(graphData);
@@ -462,7 +528,7 @@ class HaVisualiserPanel extends HTMLElement {
         edgeMinimization: true,
         blockShifting: true,
         parentCentralization: true,
-        levelSeparation: 180,          // Increased for better clarity
+        levelSeparation: 120,          // Increased for better clarity
         nodeSpacing: 120,              // Increased spacing
         treeSpacing: 250               // More space between trees
       },
@@ -572,14 +638,18 @@ class HaVisualiserPanel extends HTMLElement {
     });
     
     this.network.on('blurNode', () => {
-      graphInfo.textContent = `${nodes.length} entities, ${edges.length} relationships`;
+      const depthSelect = this.querySelector('#depthSelect');
+      const currentDepth = depthSelect ? depthSelect.value : '3';
+      graphInfo.textContent = `${nodes.length} entities, ${edges.length} relationships (${currentDepth} levels)`;
     });
     
     // Setup control buttons
     this.setupGraphControls();
     
     // Update info
-    graphInfo.textContent = `${nodes.length} entities, ${edges.length} relationships`;
+    const depthSelect = this.querySelector('#depthSelect');
+    const currentDepth = depthSelect ? depthSelect.value : '3';
+    graphInfo.textContent = `${nodes.length} entities, ${edges.length} relationships (${currentDepth} levels)`;
     
     console.log('HA Visualiser: Graph rendered successfully');
   }
@@ -850,11 +920,36 @@ class HaVisualiserPanel extends HTMLElement {
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
         if (this.network) {
-          this.network.setData({ nodes: new vis.DataSet(), edges: new vis.DataSet() });
+          // Provide user feedback
           const graphInfo = this.querySelector('#graphInfo');
+          const originalText = graphInfo ? graphInfo.textContent : '';
           if (graphInfo) {
-            graphInfo.textContent = 'Select an entity to see its relationships';
+            graphInfo.textContent = 'Resetting layout...';
           }
+          
+          // Reset the network layout/physics
+          this.network.fit();
+          
+          // Re-enable physics temporarily to reset node positions
+          this.network.setOptions({
+            physics: { 
+              enabled: true,
+              stabilization: { 
+                iterations: 200,
+                updateInterval: 25
+              }
+            }
+          });
+          
+          // Disable physics again after stabilization
+          setTimeout(() => {
+            this.network.setOptions({
+              physics: { enabled: false }
+            });
+            if (graphInfo) {
+              graphInfo.textContent = originalText || 'Layout reset complete';
+            }
+          }, 1500);
         }
       });
     }
