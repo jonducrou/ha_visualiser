@@ -83,7 +83,8 @@ async def websocket_get_neighborhood(
                     "domain": node.domain,
                     "area": node.area,
                     "device_id": node.device_id,
-                    "state": node.state
+                    "state": node.state,
+                    "icon": node.icon
                 }
                 for node in result["nodes"]
             ],
@@ -150,7 +151,8 @@ async def websocket_get_filtered_neighborhood(
                     "domain": node.domain,
                     "area": node.area,
                     "device_id": node.device_id,
-                    "state": node.state
+                    "state": node.state,
+                    "icon": node.icon
                 }
                 for node in result["nodes"]
             ],

@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.5.0: Added label relationship support');
+    console.log('HA Visualiser Panel v0.5.2: Clean entity relationship visualization');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
@@ -224,10 +224,10 @@ class HaVisualiserPanel extends HTMLElement {
       </div>
     `;
 
-    this.setupEventListeners();
+    this.setupSearchEventListeners();
   }
 
-  setupEventListeners() {
+  setupSearchEventListeners() {
     const searchInput = this.querySelector('#entitySearch');
     const searchResults = this.querySelector('#searchResults');
     
@@ -254,6 +254,7 @@ class HaVisualiserPanel extends HTMLElement {
       }
     });
   }
+
 
   async searchEntities(query) {
     console.log('HA Visualiser: Searching for entities with query:', query);
@@ -406,12 +407,12 @@ class HaVisualiserPanel extends HTMLElement {
     // Prepare vis.js data (nodes and edges already declared above)
     const visNodes = new vis.DataSet(nodes.map(node => {
       const isFocusNode = node.id === graphData.center_node;
-      const icon = this.getEntityIcon(node.domain);
+      const iconHtml = this.getMdiIconHtml(node.icon, node.domain);
       const backgroundColor = isFocusNode ? this.getFocusNodeColor(node.domain) : this.getNodeColor(node.domain);
       
       return {
         id: node.id,
-        label: `${icon} | ${node.label}`,
+        label: `${iconHtml} | ${node.label}`,
         title: this.createNodeTooltip(node),
         shape: this.getNodeShape(node.domain),
         color: {
@@ -544,6 +545,7 @@ class HaVisualiserPanel extends HTMLElement {
       this.network.destroy();
     }
     
+    
     this.network = new vis.Network(networkContainer, data, options);
     
     // Optimize layout after stabilization
@@ -581,6 +583,9 @@ class HaVisualiserPanel extends HTMLElement {
     
     console.log('HA Visualiser: Graph rendered successfully');
   }
+  
+  
+  
   
   showLoadingMessage() {
     const graphContainer = this.querySelector('#graphContainer');
@@ -693,6 +698,85 @@ class HaVisualiserPanel extends HTMLElement {
     return focusColors[domain] || '#F0F1F2';
   }
   
+  getMdiIconHtml(iconName, domain) {
+    // Convert specific MDI icons to better emoji representations
+    if (iconName && iconName.startsWith('mdi:')) {
+      // Map specific MDI icons to emojis for better visual representation
+      const mdiToEmoji = {
+        // Light variations
+        'mdi:lightbulb': '💡',
+        'mdi:lightbulb-on': '💡',
+        'mdi:lightbulb-off': '🔆',
+        'mdi:lightbulb-outline': '💡',
+        'mdi:ceiling-light': '💡',
+        'mdi:floor-lamp': '🪔',
+        'mdi:desk-lamp': '🪔',
+        'mdi:led-strip': '💡',
+        'mdi:track-light': '💡',
+        
+        // Switch variations  
+        'mdi:toggle-switch': '🔌',
+        'mdi:toggle-switch-off': '⚫',
+        'mdi:power-plug': '🔌',
+        'mdi:power-socket': '🔌',
+        'mdi:power-socket-us': '🔌',
+        'mdi:power-socket-eu': '🔌',
+        'mdi:electric-switch': '🔌',
+        'mdi:power': '⚡',
+        
+        // Sensor variations
+        'mdi:thermometer': '🌡️',
+        'mdi:thermometer-lines': '🌡️', 
+        'mdi:gauge': '📊',
+        'mdi:speedometer': '📊',
+        'mdi:chart-line': '📈',
+        'mdi:motion-sensor': '👁️',
+        'mdi:eye': '👁️',
+        'mdi:water-percent': '💧',
+        'mdi:humidity': '💧',
+        
+        // Lock variations
+        'mdi:lock': '🔒',
+        'mdi:lock-open': '🔓',
+        'mdi:key': '🔑',
+        
+        // Media variations
+        'mdi:speaker': '🔊',
+        'mdi:volume-high': '🔊',
+        'mdi:volume-medium': '🔉',
+        'mdi:volume-low': '🔈',
+        'mdi:television': '📺',
+        
+        // Climate variations
+        'mdi:thermostat': '🌡️',
+        'mdi:air-conditioner': '❄️',
+        'mdi:fan': '💨',
+        'mdi:snowflake': '❄️',
+        'mdi:fire': '🔥',
+        
+        // Common icons
+        'mdi:home': '🏠',
+        'mdi:car': '🚗',
+        'mdi:phone': '📱',
+        'mdi:camera': '📷',
+        'mdi:bell': '🔔',
+        'mdi:calendar': '📅',
+        'mdi:clock': '🕐',
+        'mdi:weather-sunny': '☀️',
+        'mdi:weather-cloudy': '☁️',
+        'mdi:umbrella': '☂️'
+      };
+      
+      // Try specific MDI icon first
+      if (mdiToEmoji[iconName]) {
+        return mdiToEmoji[iconName];
+      }
+    }
+    
+    // Fall back to domain-based emoji
+    return this.getEntityIcon(domain);
+  }
+
   getEntityIcon(domain) {
     // Map Home Assistant domains to simple text icons
     const icons = {

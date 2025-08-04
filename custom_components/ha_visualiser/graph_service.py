@@ -21,6 +21,7 @@ class GraphNode:
     area: str | None
     device_id: str | None
     state: str | None
+    icon: str | None
 
 
 @dataclass
@@ -473,6 +474,8 @@ class GraphService:
                 return 3  # Zones contain entities
             elif node_id.startswith("automation."):
                 return 4  # Automations have specific trigger/control semantics
+            elif node_id.startswith("script."):
+                return 4  # Scripts have specific trigger/control semantics (same as automations)
             else:
                 return 5  # Regular entities
         
@@ -524,6 +527,31 @@ class GraphService:
                 from_node, to_node = node_a, node_b  # automation -> entity
             else:
                 from_node, to_node = node_b, node_a  # automation -> entity
+            label = "conditional on"
+            
+        # Script relationships have same semantics as automations
+        elif relationship_type == "script_trigger":
+            # Entity -> Script (Entity triggers Script)
+            if node_a.startswith("script."):
+                from_node, to_node = node_b, node_a  # entity -> script
+            else:
+                from_node, to_node = node_a, node_b  # entity -> script
+            label = "triggers"
+            
+        elif relationship_type == "script_action":
+            # Script -> Entity (Script controls Entity)
+            if node_a.startswith("script."):
+                from_node, to_node = node_a, node_b  # script -> entity
+            else:
+                from_node, to_node = node_b, node_a  # script -> entity
+            label = "controls"
+            
+        elif relationship_type == "script_condition":
+            # Script -> Entity (Script is conditional on Entity)
+            if node_a.startswith("script."):
+                from_node, to_node = node_a, node_b  # script -> entity
+            else:
+                from_node, to_node = node_b, node_a  # script -> entity
             label = "conditional on"
             
         elif relationship_type.startswith("template:"):
@@ -583,7 +611,8 @@ class GraphService:
                 domain="device",
                 area=area_name,
                 device_id=device_id,
-                state="connected" if device.disabled_by is None else "disabled"
+                state="connected" if device.disabled_by is None else "disabled",
+                icon="mdi:devices"
             )
         
         # Handle area nodes
@@ -599,7 +628,8 @@ class GraphService:
                 domain="area",
                 area=area.name,
                 device_id=None,
-                state="active"
+                state="active",
+                icon="mdi:home-map-marker"
             )
         
         # Handle zone nodes
@@ -615,7 +645,8 @@ class GraphService:
                 domain="zone",
                 area=None,
                 device_id=None,
-                state=zone_state.state
+                state=zone_state.state,
+                icon=zone_state.attributes.get("icon", "mdi:map-marker")
             )
         
         # Handle label nodes
@@ -646,7 +677,8 @@ class GraphService:
                 domain="label",
                 area=None,
                 device_id=None,
-                state=state_info
+                state=state_info,
+                icon="mdi:tag"
             )
         
         # Handle regular entity nodes
@@ -674,14 +706,80 @@ class GraphService:
                     area = self._area_registry.async_get_area(device.area_id)
                     area_name = area.name if area else None
         
+        # Extract icon from entity state attributes, with domain-based fallback
+        entity_icon = state.attributes.get("icon")
+        if not entity_icon:
+            entity_icon = self._get_domain_fallback_icon(entity_id.split(".")[0])
+        
         return GraphNode(
             id=entity_id,
             label=state.attributes.get("friendly_name", entity_id),
             domain=entity_id.split(".")[0],
             area=area_name,
             device_id=device_id,
-            state=state.state
+            state=state.state,
+            icon=entity_icon
         )
+
+    def _get_domain_fallback_icon(self, domain: str) -> str:
+        """Get fallback MDI icon for entity domain."""
+        domain_icons = {
+            'light': 'mdi:lightbulb',
+            'switch': 'mdi:toggle-switch',
+            'sensor': 'mdi:gauge',
+            'binary_sensor': 'mdi:radiobox-marked',
+            'climate': 'mdi:thermostat',
+            'cover': 'mdi:window-shutter',
+            'fan': 'mdi:fan',
+            'lock': 'mdi:lock',
+            'media_player': 'mdi:speaker',
+            'camera': 'mdi:camera',
+            'automation': 'mdi:robot',
+            'script': 'mdi:script-text',
+            'scene': 'mdi:palette',
+            'input_boolean': 'mdi:toggle-switch-off',
+            'input_number': 'mdi:numeric',
+            'input_select': 'mdi:format-list-bulleted',
+            'input_text': 'mdi:form-textbox',
+            'timer': 'mdi:timer',
+            'counter': 'mdi:counter',
+            'person': 'mdi:account',
+            'device_tracker': 'mdi:map-marker',
+            'zone': 'mdi:map-marker-radius',
+            'sun': 'mdi:weather-sunny',
+            'weather': 'mdi:weather-cloudy',
+            'calendar': 'mdi:calendar',
+            'alarm_control_panel': 'mdi:shield-home',
+            'vacuum': 'mdi:robot-vacuum',
+            'water_heater': 'mdi:water-boiler',
+            'humidifier': 'mdi:air-humidifier',
+            'air_quality': 'mdi:air-filter',
+            'plant': 'mdi:flower',
+            'remote': 'mdi:remote',
+            'button': 'mdi:gesture-tap-button',
+            'siren': 'mdi:bullhorn',
+            'number': 'mdi:ray-vertex',
+            'select': 'mdi:format-list-checks',
+            'text': 'mdi:form-textbox',
+            'date': 'mdi:calendar-blank',
+            'time': 'mdi:clock-outline',
+            'datetime': 'mdi:calendar-clock',
+            'image': 'mdi:image',
+            'tts': 'mdi:speaker-message',
+            'stt': 'mdi:microphone-message',
+            'conversation': 'mdi:message-processing',
+            'notify': 'mdi:bell-ring',
+            'persistent_notification': 'mdi:bell-alert',
+            'group': 'mdi:group',
+            'homeassistant': 'mdi:home-assistant',
+            'update': 'mdi:package-up',
+            'todo': 'mdi:clipboard-list',
+            'lawn_mower': 'mdi:robot-mower',
+            'valve': 'mdi:valve',
+            'event': 'mdi:calendar-star'
+        }
+        return domain_icons.get(domain, 'mdi:help-circle')
+
 
     async def _find_related_entities(self, entity_id: str) -> List[tuple[str, str]]:
         """Find entities related to the given entity."""
@@ -843,6 +941,10 @@ class GraphService:
         automation_related = await self._find_automation_relationships(entity_id)
         related.extend(automation_related)
         
+        # Script-based relationships (do this for ALL entities, including scripts)
+        script_related = await self._find_script_relationships(entity_id)
+        related.extend(script_related)
+        
         # Handle regular entity relationships
         entity_entry = self._entity_registry.async_get(entity_id)
         
@@ -868,6 +970,176 @@ class GraphService:
             related.extend(label_related)
         
         return related
+
+    async def _find_script_relationships(self, entity_id: str) -> List[tuple[str, str]]:
+        """Find entities related through script triggers/actions."""
+        related = []
+        
+        _LOGGER.debug(f"Finding script relationships for: {entity_id}")
+        
+        # If this IS a script, find all entities it references
+        if entity_id.startswith("script."):
+            _LOGGER.debug(f"Entity is script, finding referenced entities")
+            
+            # First, let's see what we can find about this script
+            state = self.hass.states.get(entity_id)
+            if state:
+                _LOGGER.debug(f"Script {entity_id} state: {state.state}")
+                _LOGGER.debug(f"Script {entity_id} attributes keys: {list(state.attributes.keys())}")
+                _LOGGER.debug(f"Script {entity_id} full attributes: {state.attributes}")
+            else:
+                _LOGGER.debug(f"No state found for script: {entity_id}")
+            
+            script_related = await self._find_script_referenced_entities(entity_id)
+            related.extend(script_related)
+            _LOGGER.debug(f"Found {len(script_related)} script-referenced entities: {script_related}")
+        
+        # Scripts don't expose their configuration, but we can find automations that call this script
+        # by checking all automations for script service calls
+        
+        if entity_id.startswith("script."):
+            _LOGGER.debug(f"Finding automations that call script: {entity_id}")
+            
+            # Check all automations to see which ones call this script
+            automation_entities = [
+                eid for eid in self.hass.states.async_entity_ids() 
+                if eid.startswith("automation.")
+            ]
+            
+            for automation_id in automation_entities:
+                # Use existing automation relationship detection
+                automation_related = await self._find_automation_referenced_entities(automation_id)
+                
+                # Check if this script is in the automation's referenced entities
+                for referenced_entity, relationship_type in automation_related:
+                    if referenced_entity == entity_id:
+                        _LOGGER.debug(f"Found automation {automation_id} calls script {entity_id}")
+                        # Reverse the relationship: automation -> script becomes script <- automation
+                        related.append((automation_id, "script_trigger"))
+                        break
+        
+        _LOGGER.debug(f"Found {len(related)} automations calling script {entity_id}")
+        return related
+
+    async def _find_script_referenced_entities(self, script_id: str) -> List[tuple[str, str]]:
+        """Find all entities referenced by a script."""
+        related = []
+        
+        state = self.hass.states.get(script_id)
+        if not state:
+            _LOGGER.debug(f"No state found for script: {script_id}")
+            return related
+            
+        script_config = state.attributes
+        _LOGGER.debug(f"Analyzing script {script_id} config keys: {script_config.keys()}")
+        _LOGGER.debug(f"Full script config: {script_config}")
+        
+        # Scripts have a "sequence" which contains actions
+        sequence = script_config.get("sequence", [])
+        
+        # If no sequence in attributes, try accessing through script domain
+        if not sequence:
+            _LOGGER.debug(f"No sequence found in script attributes, trying script domain")
+            
+            # Try to access script configuration through script component
+            try:
+                # Method 1: Try script component in hass.data
+                script_component = self.hass.data.get("script")
+                if script_component:
+                    script_name = script_id.replace("script.", "")
+                    _LOGGER.debug(f"Script component found, looking for {script_name}")
+                    
+                    # Try to get the script entity from the component
+                    if hasattr(script_component, 'entities'):
+                        script_entity = script_component.entities.get(script_id)
+                        if script_entity:
+                            _LOGGER.debug(f"Found script entity: {script_entity}")
+                            if hasattr(script_entity, 'sequence'):
+                                sequence = script_entity.sequence
+                                _LOGGER.debug(f"Found sequence in script entity: {len(sequence)} actions")
+                    
+                    # Method 2: Try accessing as dict
+                    if not sequence and isinstance(script_component, dict):
+                        script_entity = script_component.get(script_name)
+                        if script_entity:
+                            _LOGGER.debug(f"Found script in component dict: {script_entity}")
+                            if hasattr(script_entity, 'sequence'):
+                                sequence = script_entity.sequence
+                                _LOGGER.debug(f"Found sequence in dict entity: {len(sequence)} actions")
+                
+                # Method 3: Try accessing through script domain services
+                if not sequence:
+                    _LOGGER.debug(f"Trying to access script config through services")
+                    services = self.hass.services.async_services().get("script", {})
+                    _LOGGER.debug(f"Available script services: {list(services.keys())}")
+                    
+                # Method 4: Check if script config is available through config entries
+                if not sequence:
+                    _LOGGER.debug(f"Checking hass.data keys: {list(self.hass.data.keys())}")
+                    for key, value in self.hass.data.items():
+                        if "script" in key.lower():
+                            _LOGGER.debug(f"Found script-related data key: {key} = {type(value)}")
+                
+            except Exception as e:
+                _LOGGER.debug(f"Error accessing script configuration: {e}")
+            
+            # If still no sequence, list what we found
+            if not sequence:
+                _LOGGER.debug(f"Still no sequence found, checking attributes again:")
+                for key, value in script_config.items():
+                    _LOGGER.debug(f"Script attribute {key}: {type(value)} = {value}")
+                return related
+        else:
+            _LOGGER.debug(f"Found sequence with {len(sequence)} actions")
+            
+            # Extract entities from actions
+            action_entities = self._extract_entities_from_config(sequence)
+            for entity_id in action_entities:
+                related.append((entity_id, "script_action"))
+            
+            # Extract entities from conditions (scripts can have conditional actions)
+            condition_entities = self._extract_entities_from_conditions(sequence)
+            for entity_id in condition_entities:
+                related.append((entity_id, "script_condition"))
+        
+        return related
+
+    def _entity_referenced_in_script(self, entity_id: str, script_config: dict) -> bool:
+        """Check if entity is referenced anywhere in a script configuration."""
+        try:
+            sequence = script_config.get("sequence", [])
+            if not sequence:
+                _LOGGER.debug(f"No sequence found in script config")
+                return False
+                
+            _LOGGER.debug(f"Checking {len(sequence)} actions in script sequence")
+            
+            # Check actions in sequence
+            for i, action in enumerate(sequence):
+                if not isinstance(action, dict):
+                    _LOGGER.debug(f"Action {i} is not a dict: {type(action)}")
+                    continue
+                    
+                _LOGGER.debug(f"Checking action {i}: {action}")
+                
+                # Check if entity is referenced in this action  
+                if self._entity_referenced_in_config([action], entity_id):
+                    _LOGGER.debug(f"Found entity {entity_id} in action {i}")
+                    return True
+                    
+                # Check conditions within conditional actions
+                if "condition" in action or "conditions" in action:
+                    conditions = action.get("conditions", action.get("condition", []))
+                    if self._entity_referenced_in_conditions(entity_id, conditions):
+                        _LOGGER.debug(f"Found entity {entity_id} in conditions of action {i}")
+                        return True
+            
+            _LOGGER.debug(f"Entity {entity_id} not found in any script actions")
+            return False
+            
+        except Exception as e:
+            _LOGGER.error(f"Error checking script entity reference: {e}")
+            return False
 
     async def _find_device_relationships(self, entity_entry) -> List[tuple[str, str]]:
         """Find device relationship - device has entity."""
@@ -1256,6 +1528,27 @@ class GraphService:
                         entities.add(resolved_entity_id)
                     else:
                         entities.add(eid)
+                
+            # Check for script service calls (both 'service' and 'action' keys)
+            service = config.get("service", config.get("action", ""))
+            if isinstance(service, str):
+                if service.startswith("script."):
+                    # Direct script call like "script.my_script"
+                    entities.add(service)
+                    _LOGGER.debug(f"Found script service call: {service}")
+                elif service == "script.turn_on":
+                    # script.turn_on service with entity_id in data
+                    service_data = config.get("data", {})
+                    if isinstance(service_data, dict):
+                        script_entity = service_data.get("entity_id")
+                        if isinstance(script_entity, str) and script_entity.startswith("script."):
+                            entities.add(script_entity)
+                            _LOGGER.debug(f"Found script.turn_on call: {script_entity}")
+                        elif isinstance(script_entity, list):
+                            for script_id in script_entity:
+                                if isinstance(script_id, str) and script_id.startswith("script."):
+                                    entities.add(script_id)
+                                    _LOGGER.debug(f"Found script.turn_on call: {script_id}")
                 
             # Check in service data
             service_data = config.get("data", {})
