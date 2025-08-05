@@ -1522,7 +1522,7 @@ class GraphService:
         _LOGGER.debug(f"Found action entities: {action_entities}")
         
         for entity_id in action_entities:
-            if entity_id != automation_id and (entity_id, "automation_trigger") not in related:
+            if entity_id != automation_id:
                 related.append((entity_id, "automation_action"))
                 _LOGGER.debug(f"Added control relationship: {automation_name} -> {entity_id}")
         
@@ -1536,7 +1536,7 @@ class GraphService:
         _LOGGER.debug(f"Found condition entities: {condition_entities}")
         
         for entity_id in condition_entities:
-            if entity_id != automation_id and (entity_id, "automation_trigger") not in related and (entity_id, "automation_action") not in related:
+            if entity_id != automation_id:
                 related.append((entity_id, "automation_condition"))
                 _LOGGER.debug(f"Added condition relationship: {entity_id} conditions {automation_name}")
         
