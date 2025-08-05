@@ -627,6 +627,22 @@ class GraphService:
             from_node, to_node = node_a, node_b
             label = "uses"
             
+        elif relationship_type == "template_uses":
+            # Template -> Entity (Template uses Entity in its template)
+            if node_a.startswith("switch.") or node_a.startswith("sensor.") or node_a.startswith("binary_sensor."):
+                from_node, to_node = node_a, node_b  # template -> entity it uses
+            else:
+                from_node, to_node = node_b, node_a  # template -> entity it uses
+            label = "uses"
+            
+        elif relationship_type == "template_depends":
+            # Entity -> Template (Template depends on Entity)
+            if node_a.startswith("switch.") or node_a.startswith("sensor.") or node_a.startswith("binary_sensor."):
+                from_node, to_node = node_b, node_a  # entity -> template that depends on it
+            else:
+                from_node, to_node = node_a, node_b  # entity -> template that depends on it
+            label = "depends on"
+            
         elif relationship_type == "labelled":
             # Label -> Object (Label labels Object)
             if node_a.startswith("label:"):
@@ -1832,7 +1848,11 @@ class GraphService:
         """Find entities related through template references."""
         related = []
         
-        # Get all template entities and input_* entities that might use templates
+        # First try to find template entities from config entries
+        template_related = await self._find_template_config_relationships(entity_id)
+        related.extend(template_related)
+        
+        # Also check traditional template entities and input_* entities that might use templates
         template_domains = ["template", "input_boolean", "input_number", "input_text", "input_select"]
         
         for domain in template_domains:
@@ -1850,6 +1870,59 @@ class GraphService:
                 if self._entity_referenced_in_templates(entity_id, state.attributes):
                     template_name = state.attributes.get("friendly_name", template_entity_id)
                     related.append((template_entity_id, f"template:{template_name}"))
+        
+        return related
+
+    async def _find_template_config_relationships(self, entity_id: str) -> List[tuple[str, str]]:
+        """Find template relationships by examining config entries."""
+        related = []
+        
+        try:
+            # Get config entries for template domain
+            config_entries = self.hass.config_entries.async_entries("template")
+            
+            for config_entry in config_entries:
+                if not config_entry.options:
+                    continue
+                    
+                template_data = config_entry.options
+                _LOGGER.debug(f"Template config entry: {template_data}")
+                
+                # Check different template types
+                template_type = template_data.get("template_type")
+                if template_type in ["switch", "sensor", "binary_sensor", "button", "number", "select", "text"]:
+                    
+                    # Get the template entity ID from the config
+                    template_name = template_data.get("name", "Unknown Template")
+                    template_entity_id = f"{template_type}.{template_name.lower().replace(' ', '_')}"
+                    
+                    # Check various template fields for entity references
+                    template_fields = [
+                        "value_template",
+                        "state_template", 
+                        "availability_template",
+                        "icon_template",
+                        "picture_template"
+                    ]
+                    
+                    for field in template_fields:
+                        template_str = template_data.get(field, "")
+                        if isinstance(template_str, str) and template_str:
+                            # Parse template for entity references
+                            referenced_entities = self._extract_entities_from_template_string_advanced(template_str)
+                            
+                            if entity_id in referenced_entities:
+                                _LOGGER.debug(f"Found template relationship: {template_entity_id} uses {entity_id}")
+                                related.append((template_entity_id, "template_uses"))
+                            
+                            # Also check reverse - if this IS the template entity, show what it depends on
+                            if entity_id == template_entity_id:
+                                for referenced_entity in referenced_entities:
+                                    _LOGGER.debug(f"Found template dependency: {entity_id} depends on {referenced_entity}")
+                                    related.append((referenced_entity, "template_depends"))
+                                    
+        except Exception as e:
+            _LOGGER.debug(f"Error finding template config relationships: {e}")
         
         return related
 
