@@ -415,6 +415,7 @@ class HaVisualiserPanel extends HTMLElement {
                 <div class="debug-status" id="debugStatus">Ready</div>
                 <button class="control-button" id="applyBtn">Apply</button>
                 <button class="control-button" id="resetLayoutBtn">Reset</button>
+                <button class="control-button" id="clearOverrideBtn">Clear Override</button>
               </div>
             </div>
             <div class="graph-info" id="graphInfo">
@@ -517,12 +518,19 @@ class HaVisualiserPanel extends HTMLElement {
       randomSeed: 42
     };
 
-    this.currentLayoutOptions = JSON.parse(JSON.stringify(this.defaultLayoutOptions));
+    // Don't set currentLayoutOptions by default - let layout selector work
+    // this.currentLayoutOptions will only be set when user actively uses debug panel
     
     if (debugBtn && debugPanel) {
       debugBtn.addEventListener('click', () => {
         debugPanel.classList.toggle('open');
         if (debugPanel.classList.contains('open')) {
+          // Initialize currentLayoutOptions when debug panel is opened
+          if (!this.currentLayoutOptions) {
+            const layoutSelector = this.querySelector('#layoutSelect');
+            const selectedLayout = layoutSelector ? layoutSelector.value : 'hierarchical';
+            this.currentLayoutOptions = this.getLayoutOptions(selectedLayout);
+          }
           // Update the editor with current layout options
           layoutEditor.value = JSON.stringify(this.currentLayoutOptions, null, 2);
           debugStatus.textContent = 'Panel opened';
@@ -550,11 +558,31 @@ class HaVisualiserPanel extends HTMLElement {
     
     if (resetLayoutBtn) {
       resetLayoutBtn.addEventListener('click', () => {
-        this.currentLayoutOptions = JSON.parse(JSON.stringify(this.defaultLayoutOptions));
+        const layoutSelector = this.querySelector('#layoutSelect');
+        const selectedLayout = layoutSelector ? layoutSelector.value : 'hierarchical';
+        this.currentLayoutOptions = this.getLayoutOptions(selectedLayout);
         layoutEditor.value = JSON.stringify(this.currentLayoutOptions, null, 2);
         this.applyLayoutToNetwork();
-        debugStatus.textContent = 'Reset to defaults';
+        debugStatus.textContent = 'Reset to layout selector defaults';
         debugStatus.className = 'debug-status success';
+      });
+    }
+    
+    const clearOverrideBtn = this.querySelector('#clearOverrideBtn');
+    if (clearOverrideBtn) {
+      clearOverrideBtn.addEventListener('click', () => {
+        // Clear the debug override and go back to layout selector control
+        this.currentLayoutOptions = null;
+        debugStatus.textContent = 'Override cleared - using layout selector';
+        debugStatus.className = 'debug-status success';
+        
+        // Close the debug panel
+        debugPanel.classList.remove('open');
+        
+        // Refresh the graph with layout selector settings
+        if (this.currentEntityId) {
+          this.selectEntity(this.currentEntityId);
+        }
       });
     }
   }
