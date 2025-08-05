@@ -1,0 +1,27 @@
+{
+  "name": "ha-visualiser",
+  "version": "0.6.2",
+  "description": "Home Assistant Entity Visualiser Integration",
+  "scripts": {
+    "lint": "npm run lint:python && npm run lint:js",
+    "lint:python": "python3 -m pylint custom_components/ha_visualiser/*.py --rcfile=.pylintrc",
+    "lint:js": "eslint custom_components/ha_visualiser/www/*.js",
+    "lint:fix": "eslint custom_components/ha_visualiser/www/*.js --fix",
+    "test": "python3 tests/run_tests.py"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
+  },
+  "keywords": [
+    "home-assistant",
+    "visualization",
+    "entity-graph",
+    "relationships"
+  ],
+  "author": "jonducrou",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jonducrou/ha_visualiser.git"
+  }
+}

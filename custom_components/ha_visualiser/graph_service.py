@@ -1185,43 +1185,6 @@ class GraphService:
         
         return related
 
-    def _entity_referenced_in_script(self, entity_id: str, script_config: dict) -> bool:
-        """Check if entity is referenced anywhere in a script configuration."""
-        try:
-            sequence = script_config.get("sequence", [])
-            if not sequence:
-                _LOGGER.debug(f"No sequence found in script config")
-                return False
-                
-            _LOGGER.debug(f"Checking {len(sequence)} actions in script sequence")
-            
-            # Check actions in sequence
-            for i, action in enumerate(sequence):
-                if not isinstance(action, dict):
-                    _LOGGER.debug(f"Action {i} is not a dict: {type(action)}")
-                    continue
-                    
-                _LOGGER.debug(f"Checking action {i}: {action}")
-                
-                # Check if entity is referenced in this action  
-                if self._entity_referenced_in_config([action], entity_id):
-                    _LOGGER.debug(f"Found entity {entity_id} in action {i}")
-                    return True
-                    
-                # Check conditions within conditional actions
-                if "condition" in action or "conditions" in action:
-                    conditions = action.get("conditions", action.get("condition", []))
-                    if self._entity_referenced_in_conditions(entity_id, conditions):
-                        _LOGGER.debug(f"Found entity {entity_id} in conditions of action {i}")
-                        return True
-            
-            _LOGGER.debug(f"Entity {entity_id} not found in any script actions")
-            return False
-            
-        except Exception as e:
-            _LOGGER.error(f"Error checking script entity reference: {e}")
-            return False
-
     async def _find_device_relationships(self, entity_entry) -> List[tuple[str, str]]:
         """Find device relationship - device has entity."""
         related = []
@@ -1331,12 +1294,6 @@ class GraphService:
         distance = 6371000 * c  # Earth radius in meters
         
         return distance
-    
-    def _is_in_zone(self, entity_lat: float, entity_lon: float, 
-                    zone_lat: float, zone_lon: float, radius: float) -> bool:
-        """Check if entity is in zone."""
-        distance = self._calculate_distance(entity_lat, entity_lon, zone_lat, zone_lon)
-        return distance <= radius
 
     async def _find_automation_relationships(self, entity_id: str) -> List[tuple[str, str]]:
         """Find entities related through automation triggers/actions."""

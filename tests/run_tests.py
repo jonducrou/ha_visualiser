@@ -107,8 +107,8 @@ class TestRunner:
         manifest_path = self.project_root / "custom_components/ha_visualiser/manifest.json"
         if manifest_path.exists():
             content = manifest_path.read_text()
-            version_correct = '"version": "0.6.1"' in content
-            self.log_test("Version 0.6.1 in manifest", version_correct)
+            version_correct = '"version": "0.6.2"' in content
+            self.log_test("Version 0.6.2 in manifest", version_correct)
         
         # Test depth defaults
         graph_service_path = self.project_root / "custom_components/ha_visualiser/graph_service.py"
@@ -250,6 +250,38 @@ class TestRunner:
                 except SyntaxError as e:
                     self.log_test(f"Syntax check: {file_path}", False, str(e))
     
+    def run_linting_checks(self):
+        """Run comprehensive linting checks."""
+        print("\n🔍 Running linting checks...")
+        
+        # Try to run the simple linter first (no external dependencies)
+        lint_script = self.project_root / "lint_simple.py"
+        if lint_script.exists():
+            try:
+                result = subprocess.run([
+                    sys.executable, str(lint_script)
+                ], capture_output=True, text=True, cwd=self.project_root)
+                
+                if result.returncode == 0:
+                    self.log_test("Comprehensive linting", True, "No critical issues found")
+                else:
+                    self.log_test("Comprehensive linting", False, "Issues found - see output above")
+                
+                # Show linting output
+                if result.stdout:
+                    print("\n" + "="*40 + " LINTING OUTPUT " + "="*40)
+                    print(result.stdout)
+                    print("="*96)
+                    
+                if result.stderr:
+                    print("\nLinting errors:")
+                    print(result.stderr)
+                    
+            except Exception as e:
+                self.log_test("Comprehensive linting", False, f"Error running linter: {e}")
+        else:
+            self.log_test("Comprehensive linting", False, "lint.py not found")
+    
     def integration_test(self):
         """Test integration configuration."""
         print("\n🔗 Testing integration configuration...")
@@ -299,6 +331,7 @@ class TestRunner:
         await self.test_graph_service_basics()
         self.test_websocket_api_structure()
         self.lint_check()
+        self.run_linting_checks()
         self.integration_test()
         
         # Summary
