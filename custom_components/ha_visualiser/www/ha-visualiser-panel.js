@@ -911,8 +911,8 @@ class HaVisualiserPanel extends HTMLElement {
       });
     });
     
-    // Add event listeners
-    this.network.on('click', (params) => {
+    // Add event listeners - use double-click to change focus node
+    this.network.on('doubleClick', (params) => {
       if (params.nodes.length > 0) {
         const nodeId = params.nodes[0];
         this.onNodeClick(nodeId);
