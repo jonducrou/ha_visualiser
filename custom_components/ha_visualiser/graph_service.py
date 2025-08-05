@@ -1851,12 +1851,16 @@ class GraphService:
         
         # Common template patterns for entity references
         patterns = [
-            r"states\(['\"]([^'\"]+)['\"]\)",           # states('entity.id')
-            r"state_attr\(['\"]([^'\"]+)['\"],",       # state_attr('entity.id', 'attr')
-            r"is_state\(['\"]([^'\"]+)['\"],",         # is_state('entity.id', 'state')
-            r"states\.([a-z_]+\.[a-z0-9_]+)",          # states.entity.id
-            r"device_attr\(['\"]([^'\"]+)['\"],",      # device_attr('entity.id', 'attr')
-            r"has_value\(['\"]([^'\"]+)['\"]\)",       # has_value('entity.id')
+            r"states\(['\"]([^'\"]+)['\"]\)",                    # states('entity.id')
+            r"state_attr\(['\"]([^'\"]+)['\"],",                # state_attr('entity.id', 'attr')
+            r"is_state\(['\"]([^'\"]+)['\"],",                  # is_state('entity.id', 'state')
+            r"states\.([a-z_]+\.[a-z0-9_]+)",                   # states.entity.id
+            r"device_attr\(['\"]([^'\"]+)['\"],",               # device_attr('entity.id', 'attr')
+            r"has_value\(['\"]([^'\"]+)['\"]\)",                # has_value('entity.id')
+            r"as_timestamp\(states\(['\"]([^'\"]+)['\"]\)\)",   # as_timestamp(states('entity.id'))
+            r"float\s*\+\s*states\(['\"]([^'\"]+)['\"]\)",      # float + states('entity.id')
+            r"states\(['\"]([^'\"]+)['\"]\)\s*\|\s*float",      # states('entity.id') | float
+            r"([a-z_]+\.[a-z0-9_]+(?:\.[a-z0-9_]+)*)",          # Direct entity.id references
         ]
         
         for pattern in patterns:
@@ -1866,10 +1870,45 @@ class GraphService:
                 if '.' not in match and pattern.startswith(r"states\."):
                     # This was a states.entity_id pattern, need to reconstruct
                     continue
+                
+                # For direct entity.id pattern, validate it looks like a real entity
+                if pattern.endswith(r"([a-z_]+\.[a-z0-9_]+(?:\.[a-z0-9_]+)*)"):
+                    # Only accept if it has a known entity domain and reasonable format
+                    if not self._is_likely_entity_id(match):
+                        continue
+                
                 entities.add(match)
                 _LOGGER.debug(f"Found entity via pattern {pattern}: {match}")
         
         return entities
+    
+    def _is_likely_entity_id(self, entity_id: str) -> bool:
+        """Check if a string looks like a valid Home Assistant entity ID."""
+        if not entity_id or '.' not in entity_id:
+            return False
+            
+        # Known Home Assistant domains
+        known_domains = {
+            'sensor', 'binary_sensor', 'switch', 'light', 'automation', 'script', 
+            'input_boolean', 'input_number', 'input_text', 'input_select', 'input_datetime',
+            'climate', 'cover', 'fan', 'media_player', 'camera', 'alarm_control_panel',
+            'device_tracker', 'person', 'zone', 'sun', 'weather', 'calendar', 'timer',
+            'counter', 'lock', 'vacuum', 'water_heater', 'humidifier', 'alert', 'template'
+        }
+        
+        parts = entity_id.split('.')
+        domain = parts[0]
+        
+        # Must be a known domain
+        if domain not in known_domains:
+            return False
+            
+        # Entity name should be reasonable (no spaces, special chars, etc.)
+        entity_name = '.'.join(parts[1:])
+        if not entity_name or not all(c.isalnum() or c in '_' for c in entity_name):
+            return False
+            
+        return True
 
     def _get_entities_for_device(self, device_id: str) -> Set[str]:
         """Get all entity IDs for a specific device."""
