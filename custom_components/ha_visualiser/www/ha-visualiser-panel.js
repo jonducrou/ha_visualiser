@@ -809,28 +809,11 @@ class HaVisualiserPanel extends HTMLElement {
     
     const layoutOptions = this.currentLayoutOptions || this.getLayoutOptions(selectedLayout);
 
+    const physicsOptions = this.getPhysicsOptions(selectedLayout);
+    
     const options = {
       layout: layoutOptions,
-      physics: {
-        enabled: true,
-        solver: 'barnesHut',
-        stabilization: { 
-          iterations: 1000,              // More iterations for better stabilization
-          updateInterval: 100,
-          onlyDynamicEdges: false,
-          fit: true
-        },
-        barnesHut: {
-          gravitationalConstant: -3000,  // Stronger repulsion
-          centralGravity: 0.2,           // Reduced central gravity
-          springLength: 150,             // Longer springs for less crowding
-          springConstant: 0.05,
-          damping: 0.15,                 // More damping for stability
-          avoidOverlap: 0.5              // Prevent node overlap
-        },
-        maxVelocity: 30,                 // Slower movement for stability
-        minVelocity: 0.75                // Higher minimum for quicker settling
-      },
+      physics: physicsOptions,
       interaction: {
         hover: true,
         tooltipDelay: 200,
@@ -1188,11 +1171,11 @@ class HaVisualiserPanel extends HTMLElement {
   getLayoutOptions(layoutType) {
     if (layoutType === 'force-directed') {
       return {
-        "improvedLayout": true,
+        "randomSeed": 42,
+        "improvedLayout": false,
         "hierarchical": {
           "enabled": false
-        },
-        "randomSeed": 42
+        }
       };
     } else {
       // Default hierarchical layout
@@ -1211,6 +1194,53 @@ class HaVisualiserPanel extends HTMLElement {
           "treeSpacing": 100   
         },
         "randomSeed": 42
+      };
+    }
+  }
+  
+  getPhysicsOptions(layoutType) {
+    if (layoutType === 'force-directed') {
+      return {
+        enabled: true,
+        solver: 'forceAtlas2Based',
+        forceAtlas2Based: {
+          gravitationalConstant: -50,
+          centralGravity: 0.01,
+          springLength: 100,
+          springConstant: 0.08,
+          damping: 0.4,
+          avoidOverlap: 0.8
+        },
+        stabilization: { 
+          iterations: 2000,
+          updateInterval: 50,
+          onlyDynamicEdges: false,
+          fit: true
+        },
+        maxVelocity: 20,
+        minVelocity: 0.1
+      };
+    } else {
+      // Hierarchical layout physics
+      return {
+        enabled: true,
+        solver: 'barnesHut',
+        stabilization: { 
+          iterations: 1000,
+          updateInterval: 100,
+          onlyDynamicEdges: false,
+          fit: true
+        },
+        barnesHut: {
+          gravitationalConstant: -3000,
+          centralGravity: 0.2,
+          springLength: 150,
+          springConstant: 0.05,
+          damping: 0.15,
+          avoidOverlap: 0.5
+        },
+        maxVelocity: 30,
+        minVelocity: 0.75
       };
     }
   }
