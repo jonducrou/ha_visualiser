@@ -1184,8 +1184,11 @@ class HaVisualiserPanel extends HTMLElement {
         const labels = groupedEdges.map(e => e.label);
         const relationshipTypes = groupedEdges.map(e => e.relationship_type);
         
+        // Deduplicate labels - only show unique labels
+        const uniqueLabels = [...new Set(labels)];
+        
         // Create compound label and title
-        const combinedLabel = labels.join(', ');
+        const combinedLabel = uniqueLabels.join(', ');
         const combinedTitle = groupedEdges.map(e => `${e.relationship_type}: ${e.label}`).join('\n');
         
         // Use the first relationship type for coloring, or create a compound type
