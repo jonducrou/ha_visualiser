@@ -305,6 +305,35 @@ class HaVisualiserPanel extends HTMLElement {
           cursor: pointer;
         }
         
+        .layout-control {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+          flex-shrink: 0;
+          min-width: 160px;
+          height: 40px;
+        }
+        
+        .layout-control label {
+          margin: 0;
+          font-weight: 500;
+          color: var(--primary-text-color);
+          font-size: 14px;
+        }
+        
+        .layout-control select {
+          padding: 8px 12px;
+          border: 1px solid var(--divider-color);
+          border-radius: 4px;
+          background: var(--primary-background-color);
+          color: var(--primary-text-color);
+          font-size: 14px;
+          min-width: 120px;
+          height: 40px;
+          box-sizing: border-box;
+        }
+        
         .graph-info {
           position: absolute;
           bottom: 16px;
@@ -361,6 +390,13 @@ class HaVisualiserPanel extends HTMLElement {
               <input type="checkbox" id="showAreasCheckbox" checked>
               Show Areas
             </label>
+          </div>
+          <div class="layout-control">
+            <label for="layoutSelect">Layout:</label>
+            <select id="layoutSelect">
+              <option value="hierarchical" selected>Hierarchical</option>
+              <option value="force-directed">Force-Directed</option>
+            </select>
           </div>
         </div>
         
@@ -438,6 +474,16 @@ class HaVisualiserPanel extends HTMLElement {
     if (showAreasCheckbox) {
       showAreasCheckbox.addEventListener('change', () => {
         // If we have a current entity selected, refresh the graph with new filter settings
+        if (this.currentEntityId) {
+          this.selectEntity(this.currentEntityId);
+        }
+      });
+    }
+    
+    const layoutSelect = this.querySelector('#layoutSelect');
+    if (layoutSelect) {
+      layoutSelect.addEventListener('change', () => {
+        // If we have a current entity selected, refresh the graph with new layout
         if (this.currentEntityId) {
           this.selectEntity(this.currentEntityId);
         }
@@ -757,25 +803,11 @@ class HaVisualiserPanel extends HTMLElement {
     
     const data = { nodes: visNodes, edges: visEdges };
 
-    // Use debug panel layout options if available, otherwise use defaults
-    const layoutOptions = this.currentLayoutOptions || 
+    // Use debug panel layout options if available, otherwise use layout selector
+    const layoutSelector = this.querySelector('#layoutSelect');
+    const selectedLayout = layoutSelector ? layoutSelector.value : 'hierarchical';
     
-    {
-      "improvedLayout": true,
-      "hierarchical": {
-        "enabled": true,
-        "direction": "LR",
-        "sortMethod": "directed",
-        "shakeTowards": "leaves",
-        "edgeMinimization": true,
-        "blockShifting": true,
-        "parentCentralization": true,
-        "levelSeparation": 250,  
-        "nodeSpacing": 20,
-        "treeSpacing": 100   
-      },
-      "randomSeed": 42
-    };
+    const layoutOptions = this.currentLayoutOptions || this.getLayoutOptions(selectedLayout);
 
     const options = {
       layout: layoutOptions,
@@ -1151,6 +1183,36 @@ class HaVisualiserPanel extends HTMLElement {
       return '#B8B8B8';  // Medium grey for group relationships
     }
     return '#D0D0D0';    // Very light grey for other relationships
+  }
+  
+  getLayoutOptions(layoutType) {
+    if (layoutType === 'force-directed') {
+      return {
+        "improvedLayout": true,
+        "hierarchical": {
+          "enabled": false
+        },
+        "randomSeed": 42
+      };
+    } else {
+      // Default hierarchical layout
+      return {
+        "improvedLayout": true,
+        "hierarchical": {
+          "enabled": true,
+          "direction": "LR",
+          "sortMethod": "directed",
+          "shakeTowards": "leaves",
+          "edgeMinimization": true,
+          "blockShifting": true,
+          "parentCentralization": true,
+          "levelSeparation": 250,  
+          "nodeSpacing": 20,
+          "treeSpacing": 100   
+        },
+        "randomSeed": 42
+      };
+    }
   }
   
   bundleMultipleRelationships(edges) {
