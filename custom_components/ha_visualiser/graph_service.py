@@ -643,6 +643,22 @@ class GraphService:
                 from_node, to_node = node_a, node_b  # entity -> template that depends on it
             label = "depends on"
             
+        elif relationship_type == "alert_monitors":
+            # Alert -> Entity (Alert monitors Entity)
+            if node_a.startswith("alert."):
+                from_node, to_node = node_a, node_b  # alert -> entity it monitors
+            else:
+                from_node, to_node = node_b, node_a  # alert -> entity it monitors
+            label = "monitors"
+            
+        elif relationship_type == "alert_depends":
+            # Entity -> Alert (Alert depends on Entity)
+            if node_a.startswith("alert."):
+                from_node, to_node = node_b, node_a  # entity -> alert that depends on it
+            else:
+                from_node, to_node = node_a, node_b  # entity -> alert that depends on it
+            label = "alerts"
+            
         elif relationship_type == "labelled":
             # Label -> Object (Label labels Object)
             if node_a.startswith("label:"):
@@ -1045,6 +1061,10 @@ class GraphService:
         script_related = await self._find_script_relationships(entity_id)
         related.extend(script_related)
         
+        # Alert-based relationships (do this for ALL entities, including alerts)
+        alert_related = await self._find_alert_relationships(entity_id)
+        related.extend(alert_related)
+        
         # Handle regular entity relationships
         entity_entry = self._entity_registry.async_get(entity_id)
         
@@ -1206,6 +1226,76 @@ class GraphService:
             for entity_id in condition_entities:
                 related.append((entity_id, "script_condition"))
         
+        return related
+
+    async def _find_alert_relationships(self, entity_id: str) -> List[tuple[str, str]]:
+        """Find entities related through alert configurations."""
+        related = []
+        
+        _LOGGER.debug(f"Finding alert relationships for: {entity_id}")
+        
+        # If this IS an alert, find all entities it references
+        if entity_id.startswith("alert."):
+            _LOGGER.debug(f"Entity is alert, finding referenced entities")
+            alert_related = await self._find_alert_referenced_entities(entity_id)
+            related.extend(alert_related)
+            _LOGGER.debug(f"Found {len(alert_related)} alert-referenced entities: {alert_related}")
+        
+        # Find alerts that reference this entity
+        alert_entities = [
+            eid for eid in self.hass.states.async_entity_ids() 
+            if eid.startswith("alert.")
+        ]
+        
+        _LOGGER.debug(f"Found {len(alert_entities)} total alerts to check")
+        
+        for alert_id in alert_entities:
+            if alert_id == entity_id:  # Skip self
+                continue
+                
+            state = self.hass.states.get(alert_id)
+            if not state:
+                _LOGGER.debug(f"No state for alert: {alert_id}")
+                continue
+                
+            # Check alert configuration for entity references
+            alert_config = state.attributes
+            _LOGGER.debug(f"Checking alert {alert_id} for references to {entity_id}")
+            _LOGGER.debug(f"Alert attributes: {list(alert_config.keys())}")
+            
+            # Check if our entity is referenced as the alert's entity_id
+            alert_entity_id = alert_config.get("entity_id")
+            if alert_entity_id == entity_id:
+                alert_name = state.attributes.get("friendly_name", alert_id)
+                related.append((alert_id, "alert_monitors"))
+                _LOGGER.debug(f"Found alert relationship: {alert_name} monitors {entity_id}")
+        
+        _LOGGER.debug(f"Total alert relationships found: {len(related)}")
+        return related
+
+    async def _find_alert_referenced_entities(self, alert_id: str) -> List[tuple[str, str]]:
+        """Find all entities referenced by a specific alert."""
+        related = []
+        
+        _LOGGER.debug(f"Finding entities referenced by alert: {alert_id}")
+        
+        state = self.hass.states.get(alert_id)
+        if not state:
+            _LOGGER.debug(f"No state found for alert: {alert_id}")
+            return related
+            
+        alert_config = state.attributes
+        alert_name = state.attributes.get("friendly_name", alert_id)
+        _LOGGER.debug(f"Alert name: {alert_name}")
+        _LOGGER.debug(f"Alert config keys: {list(alert_config.keys()) if alert_config else 'No config'}")
+        
+        # Check for entity_id in alert configuration
+        alert_entity_id = alert_config.get("entity_id")
+        if alert_entity_id:
+            _LOGGER.debug(f"Found alert entity_id dependency: {alert_entity_id}")
+            related.append((alert_entity_id, "alert_depends"))
+        
+        _LOGGER.debug(f"Total entities found for {alert_name}: {len(related)}")
         return related
 
     async def _find_device_relationships(self, entity_entry) -> List[tuple[str, str]]:

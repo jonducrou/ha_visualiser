@@ -1146,6 +1146,7 @@ class HaVisualiserPanel extends HTMLElement {
       'sensor': '📊',
       'automation': '🤖',
       'script': '📝',
+      'alert': '🚨',
       'scene': '🎬',
       'input_boolean': '☑️',
       'input_number': '🔢',
