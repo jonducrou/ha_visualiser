@@ -742,14 +742,17 @@ class HaVisualiserPanel extends HTMLElement {
       };
     }));
     
-    const visEdges = new vis.DataSet(edges.map(edge => ({
+    // Bundle multiple relationships between the same nodes
+    const bundledEdges = this.bundleMultipleRelationships(edges);
+    
+    const visEdges = new vis.DataSet(bundledEdges.map(edge => ({
       from: edge.from_node,
       to: edge.to_node,
       label: edge.label,
-      title: `${edge.relationship_type}: ${edge.label}`,
+      title: edge.title,
       arrows: 'to',
       color: this.getEdgeColor(edge.relationship_type),
-      width: 2
+      width: edge.width || 2
     })));
     
     const data = { nodes: visNodes, edges: visEdges };
@@ -1148,6 +1151,59 @@ class HaVisualiserPanel extends HTMLElement {
       return '#B8B8B8';  // Medium grey for group relationships
     }
     return '#D0D0D0';    // Very light grey for other relationships
+  }
+  
+  bundleMultipleRelationships(edges) {
+    // Group edges by their from_node and to_node pair
+    const edgeGroups = new Map();
+    
+    for (const edge of edges) {
+      const key = `${edge.from_node}:${edge.to_node}`;
+      if (!edgeGroups.has(key)) {
+        edgeGroups.set(key, []);
+      }
+      edgeGroups.get(key).push(edge);
+    }
+    
+    // Process each group of edges
+    const bundledEdges = [];
+    
+    for (const [key, groupedEdges] of edgeGroups) {
+      if (groupedEdges.length === 1) {
+        // Single relationship - keep as is
+        const edge = groupedEdges[0];
+        bundledEdges.push({
+          from_node: edge.from_node,
+          to_node: edge.to_node,
+          label: edge.label,
+          title: `${edge.relationship_type}: ${edge.label}`,
+          relationship_type: edge.relationship_type
+        });
+      } else {
+        // Multiple relationships - bundle them
+        const labels = groupedEdges.map(e => e.label);
+        const relationshipTypes = groupedEdges.map(e => e.relationship_type);
+        
+        // Create compound label and title
+        const combinedLabel = labels.join(', ');
+        const combinedTitle = groupedEdges.map(e => `${e.relationship_type}: ${e.label}`).join('\n');
+        
+        // Use the first relationship type for coloring, or create a compound type
+        const combinedRelationshipType = relationshipTypes.length > 1 ? 
+          relationshipTypes.join('_') : relationshipTypes[0];
+        
+        bundledEdges.push({
+          from_node: groupedEdges[0].from_node,
+          to_node: groupedEdges[0].to_node,
+          label: combinedLabel,
+          title: combinedTitle,
+          relationship_type: combinedRelationshipType,
+          width: Math.min(2 + groupedEdges.length * 0.5, 4)  // Increase width for multiple relationships
+        });
+      }
+    }
+    
+    return bundledEdges;
   }
   
   setupGraphControls() {
