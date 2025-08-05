@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.6.4: Added area filtering with Show Areas checkbox');
+    console.log('HA Visualiser Panel v0.7.1: Added area filtering with Show Areas checkbox');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
@@ -807,9 +807,13 @@ class HaVisualiserPanel extends HTMLElement {
     const layoutSelector = this.querySelector('#layoutSelect');
     const selectedLayout = layoutSelector ? layoutSelector.value : 'hierarchical';
     
-    const layoutOptions = this.currentLayoutOptions || this.getLayoutOptions(selectedLayout);
+    const layoutOptions = this.currentLayoutOptions ? this.currentLayoutOptions : this.getLayoutOptions(selectedLayout);
 
-    const physicsOptions = this.getPhysicsOptions(selectedLayout);
+    // Use appropriate physics for the layout type (debug panel can override layout but not physics logic)
+    const effectiveLayoutType = this.currentLayoutOptions && this.currentLayoutOptions.hierarchical && this.currentLayoutOptions.hierarchical.enabled 
+      ? 'hierarchical' 
+      : selectedLayout;
+    const physicsOptions = this.getPhysicsOptions(effectiveLayoutType);
     
     const options = {
       layout: layoutOptions,
