@@ -1278,11 +1278,15 @@ class HaVisualiserPanel extends HTMLElement {
   }
   
   bundleMultipleRelationships(edges) {
-    // Group edges by their from_node and to_node pair
+    // Group edges by their node pair (bidirectional)
     const edgeGroups = new Map();
     
     for (const edge of edges) {
-      const key = `${edge.from_node}:${edge.to_node}`;
+      // Create a bidirectional key - sort nodes alphabetically for consistent grouping
+      const nodeA = edge.from_node;
+      const nodeB = edge.to_node;
+      const key = nodeA < nodeB ? `${nodeA}:${nodeB}` : `${nodeB}:${nodeA}`;
+      
       if (!edgeGroups.has(key)) {
         edgeGroups.set(key, []);
       }
@@ -1319,9 +1323,20 @@ class HaVisualiserPanel extends HTMLElement {
         const combinedRelationshipType = relationshipTypes.length > 1 ? 
           relationshipTypes.join('_') : relationshipTypes[0];
         
+        // Determine the best direction for the bundled edge
+        // Prefer automation->entity direction if there's a control relationship
+        let bestEdge = groupedEdges[0];
+        for (const edge of groupedEdges) {
+          if (edge.relationship_type === 'automation_action' || 
+              edge.from_node.startsWith('automation.')) {
+            bestEdge = edge;
+            break;
+          }
+        }
+        
         bundledEdges.push({
-          from_node: groupedEdges[0].from_node,
-          to_node: groupedEdges[0].to_node,
+          from_node: bestEdge.from_node,
+          to_node: bestEdge.to_node,
           label: combinedLabel,
           title: combinedTitle,
           relationship_type: combinedRelationshipType,
