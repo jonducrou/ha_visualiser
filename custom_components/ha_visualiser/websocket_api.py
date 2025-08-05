@@ -59,6 +59,7 @@ async def websocket_search_entities(
     vol.Required("type"): "ha_visualiser/get_neighborhood",
     vol.Required("entity_id"): str,
     vol.Optional("max_depth", default=3): int,
+    vol.Optional("show_areas", default=True): bool,
 })
 @websocket_api.async_response
 async def websocket_get_neighborhood(
@@ -71,7 +72,8 @@ async def websocket_get_neighborhood(
         graph_service = hass.data[DOMAIN]["graph_service"]
         result = await graph_service.get_entity_neighborhood(
             msg["entity_id"],
-            msg["max_depth"]
+            msg["max_depth"],
+            show_areas=msg["show_areas"]
         )
         
         # Convert dataclasses to dicts for JSON serialization

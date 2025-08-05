@@ -45,7 +45,7 @@ class GraphService:
         self._label_registry = label_registry.async_get(hass)
 
     async def get_entity_neighborhood(
-        self, entity_id: str, max_depth: int = 3
+        self, entity_id: str, max_depth: int = 3, show_areas: bool = True
     ) -> Dict[str, Any]:
         """Get the neighborhood graph for a specific entity, device, area, zone, or label."""
         
@@ -83,7 +83,7 @@ class GraphService:
         
         # Start with the target entity or device
         await self._add_entity_and_neighbors_with_distance(
-            entity_id, nodes, edges, distances, edge_set, max_depth, 0
+            entity_id, nodes, edges, distances, edge_set, max_depth, 0, show_areas
         )
         
         return {
@@ -426,7 +426,8 @@ class GraphService:
         distances: Dict[str, int],
         edge_set: Set[str],
         max_depth: int,
-        current_distance: int
+        current_distance: int,
+        show_areas: bool = True
     ) -> None:
         """Recursively add entity and its neighbors using distance-based traversal."""
         # Skip if we're beyond max depth
@@ -454,6 +455,12 @@ class GraphService:
         related_entities = await self._find_related_entities(entity_id)
         
         for related_id, relationship_type in related_entities:
+            # Filter out area-related entities if show_areas is False
+            if not show_areas:
+                if (related_id.startswith("area:") or 
+                    relationship_type in ["area_contains", "area_contains_device", "device_in_area"]):
+                    continue
+                    
             # Create edge between current entity and related entity
             edge = self._create_symmetrical_edge(entity_id, related_id, relationship_type)
             if edge:
@@ -465,7 +472,7 @@ class GraphService:
             
             # Recursively add neighbor with increased distance
             await self._add_entity_and_neighbors_with_distance(
-                related_id, nodes, edges, distances, edge_set, max_depth, current_distance + 1
+                related_id, nodes, edges, distances, edge_set, max_depth, current_distance + 1, show_areas
             )
     
     async def _add_entity_and_neighbors(

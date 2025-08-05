@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.6.2: Added group relationship detection and filtering');
+    console.log('HA Visualiser Panel v0.6.4: Added area filtering with Show Areas checkbox');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
@@ -61,12 +61,17 @@ class HaVisualiserPanel extends HTMLElement {
           display: flex;
           align-items: flex-start;
           gap: 16px;
+          min-height: 56px;
         }
         
         .search-container {
           flex: 0 1 70%;
           max-width: 400px;
           position: relative;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-start;
+          z-index: 100;
         }
         
         .search-input {
@@ -77,12 +82,23 @@ class HaVisualiserPanel extends HTMLElement {
           font-size: 16px;
           background: var(--primary-background-color);
           color: var(--primary-text-color);
+          height: 40px;
+          box-sizing: border-box;
         }
         
         .search-results {
-          margin-top: 12px;
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          margin-top: 4px;
           max-height: 200px;
           overflow-y: auto;
+          background: var(--card-background-color);
+          border: 1px solid var(--divider-color);
+          border-radius: 4px;
+          box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0,0,0,0.15));
+          z-index: 1000;
         }
         
         .search-result {
@@ -151,6 +167,66 @@ class HaVisualiserPanel extends HTMLElement {
           gap: 8px;
         }
         
+        .debug-panel {
+          position: absolute;
+          top: 16px;
+          left: 16px;
+          z-index: 100;
+          background: var(--card-background-color, white);
+          border: 1px solid var(--divider-color, #ccc);
+          border-radius: 8px;
+          padding: 16px;
+          max-width: 400px;
+          max-height: 500px;
+          box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0,0,0,0.1));
+          display: none;
+          flex-direction: column;
+        }
+        
+        .debug-panel.open {
+          display: flex;
+        }
+        
+        .debug-panel h3 {
+          margin: 0 0 12px 0;
+          font-size: 14px;
+          color: var(--primary-text-color, #333);
+        }
+        
+        .debug-textarea {
+          width: 100%;
+          min-height: 300px;
+          font-family: 'Courier New', monospace;
+          font-size: 12px;
+          border: 1px solid var(--divider-color, #ccc);
+          border-radius: 4px;
+          padding: 8px;
+          background: var(--primary-background-color, white);
+          color: var(--primary-text-color, #333);
+          resize: vertical;
+        }
+        
+        .debug-controls {
+          display: flex;
+          gap: 8px;
+          margin-top: 12px;
+          align-items: center;
+        }
+        
+        .debug-status {
+          font-size: 12px;
+          color: var(--secondary-text-color, #666);
+          flex: 1;
+        }
+        
+        .debug-status.error {
+          color: var(--error-color, #e74c3c);
+        }
+        
+        .debug-status.success {
+          color: var(--success-color, #27ae60);
+        }
+        
         .control-button {
           padding: 8px 12px;
           background: var(--primary-color, #0369a1);
@@ -179,9 +255,9 @@ class HaVisualiserPanel extends HTMLElement {
           align-items: center;
           gap: 8px;
           white-space: nowrap;
-          margin-top: 2px;
           flex-shrink: 0;
           min-width: 140px;
+          height: 40px;
         }
         
         .depth-control label {
@@ -199,6 +275,34 @@ class HaVisualiserPanel extends HTMLElement {
           color: var(--primary-text-color);
           font-size: 14px;
           min-width: 100px;
+          height: 40px;
+          box-sizing: border-box;
+        }
+        
+        .filter-control {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+          flex-shrink: 0;
+          min-width: 120px;
+          height: 40px;
+        }
+        
+        .filter-control label {
+          margin: 0;
+          font-weight: 500;
+          color: var(--primary-text-color);
+          font-size: 14px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          cursor: pointer;
+        }
+        
+        .filter-control input[type="checkbox"] {
+          margin: 0;
+          cursor: pointer;
         }
         
         .graph-info {
@@ -252,6 +356,12 @@ class HaVisualiserPanel extends HTMLElement {
               <option value="5">5 Levels</option>
             </select>
           </div>
+          <div class="filter-control">
+            <label>
+              <input type="checkbox" id="showAreasCheckbox" checked>
+              Show Areas
+            </label>
+          </div>
         </div>
         
         <div class="graph-section">
@@ -260,6 +370,16 @@ class HaVisualiserPanel extends HTMLElement {
             <div class="graph-controls">
               <button class="control-button" id="fitBtn">Fit</button>
               <button class="control-button" id="resetBtn">Reset</button>
+              <button class="control-button" id="debugBtn" title="Toggle Debug Panel">🔧</button>
+            </div>
+            <div class="debug-panel" id="debugPanel">
+              <h3>Layout Debug</h3>
+              <textarea class="debug-textarea" id="layoutEditor" placeholder="Layout options JSON will appear here..."></textarea>
+              <div class="debug-controls">
+                <div class="debug-status" id="debugStatus">Ready</div>
+                <button class="control-button" id="applyBtn">Apply</button>
+                <button class="control-button" id="resetLayoutBtn">Reset</button>
+              </div>
             </div>
             <div class="graph-info" id="graphInfo">
               Select an entity to see its relationships
@@ -271,6 +391,7 @@ class HaVisualiserPanel extends HTMLElement {
 
     this.setupSearchEventListeners();
     this.setupDepthControl();
+    this.setupDebugPanel();
   }
 
   setupSearchEventListeners() {
@@ -303,6 +424,7 @@ class HaVisualiserPanel extends HTMLElement {
 
   setupDepthControl() {
     const depthSelect = this.querySelector('#depthSelect');
+    const showAreasCheckbox = this.querySelector('#showAreasCheckbox');
     
     if (depthSelect) {
       depthSelect.addEventListener('change', () => {
@@ -311,6 +433,120 @@ class HaVisualiserPanel extends HTMLElement {
           this.selectEntity(this.currentEntityId);
         }
       });
+    }
+    
+    if (showAreasCheckbox) {
+      showAreasCheckbox.addEventListener('change', () => {
+        // If we have a current entity selected, refresh the graph with new filter settings
+        if (this.currentEntityId) {
+          this.selectEntity(this.currentEntityId);
+        }
+      });
+    }
+  }
+
+  setupDebugPanel() {
+    const debugBtn = this.querySelector('#debugBtn');
+    const debugPanel = this.querySelector('#debugPanel');
+    const layoutEditor = this.querySelector('#layoutEditor');
+    const applyBtn = this.querySelector('#applyBtn');
+    const resetLayoutBtn = this.querySelector('#resetLayoutBtn');
+    const debugStatus = this.querySelector('#debugStatus');
+    
+    // Initialize with default layout options
+    this.defaultLayoutOptions = {
+      improvedLayout: true,
+      hierarchical: {
+        enabled: true,
+        direction: 'LR',
+        sortMethod: 'directed',
+        shakeTowards: 'leaves',
+        edgeMinimization: true,
+        blockShifting: true,
+        parentCentralization: true,
+        levelSeparation: 250,
+        nodeSpacing: 20,  
+        treeSpacing: 100
+      },
+      randomSeed: 42
+    };
+
+    this.currentLayoutOptions = JSON.parse(JSON.stringify(this.defaultLayoutOptions));
+    
+    if (debugBtn && debugPanel) {
+      debugBtn.addEventListener('click', () => {
+        debugPanel.classList.toggle('open');
+        if (debugPanel.classList.contains('open')) {
+          // Update the editor with current layout options
+          layoutEditor.value = JSON.stringify(this.currentLayoutOptions, null, 2);
+          debugStatus.textContent = 'Panel opened';
+          debugStatus.className = 'debug-status';
+        }
+      });
+    }
+    
+    if (layoutEditor) {
+      // Auto-apply on typing (with debounce)
+      let debounceTimer;
+      layoutEditor.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          this.validateAndApplyLayout();
+        }, 500); // 500ms delay
+      });
+    }
+    
+    if (applyBtn) {
+      applyBtn.addEventListener('click', () => {
+        this.validateAndApplyLayout();
+      });
+    }
+    
+    if (resetLayoutBtn) {
+      resetLayoutBtn.addEventListener('click', () => {
+        this.currentLayoutOptions = JSON.parse(JSON.stringify(this.defaultLayoutOptions));
+        layoutEditor.value = JSON.stringify(this.currentLayoutOptions, null, 2);
+        this.applyLayoutToNetwork();
+        debugStatus.textContent = 'Reset to defaults';
+        debugStatus.className = 'debug-status success';
+      });
+    }
+  }
+
+  validateAndApplyLayout() {
+    const layoutEditor = this.querySelector('#layoutEditor');
+    const debugStatus = this.querySelector('#debugStatus');
+    
+    try {
+      const newOptions = JSON.parse(layoutEditor.value);
+      this.currentLayoutOptions = newOptions;
+      this.applyLayoutToNetwork();
+      debugStatus.textContent = 'Layout applied successfully';
+      debugStatus.className = 'debug-status success';
+    } catch (error) {
+      debugStatus.textContent = `JSON Error: ${error.message}`;
+      debugStatus.className = 'debug-status error';
+    }
+  }
+
+  applyLayoutToNetwork() {
+    if (this.network && this.currentGraphData) {
+      console.log('Applying new layout options:', this.currentLayoutOptions);
+      
+      // Update the network options with new layout
+      this.network.setOptions({
+        layout: this.currentLayoutOptions,
+        physics: { enabled: true } // Re-enable physics to apply new layout
+      });
+      
+      // Disable physics after a short delay to stabilize
+      setTimeout(() => {
+        if (this.network) {
+          this.network.setOptions({
+            physics: { enabled: false }
+          });
+        }
+      }, 2000);
     }
   }
 
@@ -401,15 +637,18 @@ class HaVisualiserPanel extends HTMLElement {
       this.network.setData({ nodes: new vis.DataSet(), edges: new vis.DataSet() });
     }
     
-    // Get selected depth
+    // Get selected depth and filter settings
     const depthSelect = this.querySelector('#depthSelect');
+    const showAreasCheckbox = this.querySelector('#showAreasCheckbox');
     const maxDepth = depthSelect ? parseInt(depthSelect.value) : 3;
+    const showAreas = showAreasCheckbox ? showAreasCheckbox.checked : true;
     
     try {
       const graphData = await this.hass.callWS({
         type: 'ha_visualiser/get_neighborhood',
         entity_id: entityId,
-        max_depth: maxDepth
+        max_depth: maxDepth,
+        show_areas: showAreas
       });
       
       this.renderGraph(graphData);
@@ -439,6 +678,9 @@ class HaVisualiserPanel extends HTMLElement {
   renderGraph(graphData) {
     console.log('HA Visualiser: Rendering graph with data:', graphData);
     
+    // Store graph data for debug panel
+    this.currentGraphData = graphData;
+    
     if (!window.vis) {
       console.error('HA Visualiser: vis.js not loaded');
       this.showLoadingMessage();
@@ -448,7 +690,7 @@ class HaVisualiserPanel extends HTMLElement {
     // Detect if this is a complex graph that might benefit from force-directed layout
     const nodes = graphData.nodes || [];
     const edges = graphData.edges || [];
-    const isComplexGraph = false; //edges.length > nodes.length * 1.5; // High edge-to-node ratio
+    const isComplexGraph = false; // Keep consistent with original logic
     
     console.log(`HA Visualiser: Graph analysis - ${nodes.length} nodes, ${edges.length} edges, ratio: ${(edges.length / nodes.length).toFixed(2)}, using ${isComplexGraph ? 'force-directed' : 'hierarchical'} layout`);
     
@@ -512,27 +754,24 @@ class HaVisualiserPanel extends HTMLElement {
     
     const data = { nodes: visNodes, edges: visEdges };
 
-    // Choose layout algorithm based on graph complexity
-    const layoutOptions = isComplexGraph ? {
-      // Force-directed layout for complex graphs
-      improvedLayout: true,
-      randomSeed: 42
-    } : {
-      // Hierarchical layout for simpler graphs
-      improvedLayout: true,
-      hierarchical: {
-        enabled: true,
-        direction: 'UD',
-        sortMethod: 'directed',
-        shakeTowards: 'leaves',        // Helps with edge crossing reduction
-        edgeMinimization: true,
-        blockShifting: true,
-        parentCentralization: true,
-        levelSeparation: 120,          // Increased for better clarity
-        nodeSpacing: 120,              // Increased spacing
-        treeSpacing: 250               // More space between trees
+    // Use debug panel layout options if available, otherwise use defaults
+    const layoutOptions = this.currentLayoutOptions || 
+    
+    {
+      "improvedLayout": true,
+      "hierarchical": {
+        "enabled": true,
+        "direction": "LR",
+        "sortMethod": "directed",
+        "shakeTowards": "leaves",
+        "edgeMinimization": true,
+        "blockShifting": true,
+        "parentCentralization": true,
+        "levelSeparation": 250,  
+        "nodeSpacing": 20,
+        "treeSpacing": 100   
       },
-      randomSeed: 42                   // Consistent layouts
+      "randomSeed": 42
     };
 
     const options = {
