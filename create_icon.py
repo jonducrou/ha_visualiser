@@ -62,8 +62,25 @@ def create_svg_icon():
   <circle cx="122" cy="140" r="26" fill="#ddd6fe" stroke="#5b21b6" stroke-width="3"/>
   <line x1="140" y1="158" x2="222" y2="232" stroke="#6c757d" stroke-width="3"/>
   
-  <!-- Add extra large house icon in center -->
-  <text x="256" y="290" text-anchor="middle" font-family="Arial, sans-serif" font-size="144" font-weight="bold" fill="#495057">🏠</text>
+  <!-- Add extra large SVG house icon in center with nice colors -->
+  <g transform="translate(256,256) scale(1.5)">
+    <!-- House base -->
+    <rect x="-35" y="-15" width="70" height="50" fill="#4a90e2" stroke="#2c5282" stroke-width="2" rx="3"/>
+    <!-- House roof -->
+    <polygon points="-45,-15 0,-45 45,-15" fill="#e53e3e" stroke="#c53030" stroke-width="2"/>
+    <!-- Door -->
+    <rect x="-8" y="10" width="16" height="25" fill="#805ad5" stroke="#553c9a" stroke-width="1" rx="2"/>
+    <!-- Door knob -->
+    <circle cx="5" cy="22" r="2" fill="#ffd700"/>
+    <!-- Windows -->
+    <rect x="-25" y="-5" width="12" height="12" fill="#bee3f8" stroke="#2c5282" stroke-width="1" rx="1"/>
+    <rect x="13" y="-5" width="12" height="12" fill="#bee3f8" stroke="#2c5282" stroke-width="1" rx="1"/>
+    <!-- Window cross -->
+    <line x1="-19" y1="-5" x2="-19" y2="7" stroke="#2c5282" stroke-width="1"/>
+    <line x1="-25" y1="1" x2="-13" y2="1" stroke="#2c5282" stroke-width="1"/>
+    <line x1="19" y1="-5" x2="19" y2="7" stroke="#2c5282" stroke-width="1"/>
+    <line x1="13" y1="1" x2="25" y2="1" stroke="#2c5282" stroke-width="1"/>
+  </g>
 </svg>'''
     
     return svg_content
