@@ -1,5 +1,10 @@
 # Home Assistant Entity Visualizer
 
+[![GitHub Release](https://img.shields.io/github/release/jonducrou/ha_visualiser.svg?style=for-the-badge)](https://github.com/jonducrou/ha_visualiser/releases)
+[![GitHub Activity](https://img.shields.io/github/commit-activity/y/jonducrou/ha_visualiser.svg?style=for-the-badge)](https://github.com/jonducrou/ha_visualiser/commits/main)
+[![License](https://img.shields.io/github/license/jonducrou/ha_visualiser.svg?style=for-the-badge)](LICENSE)
+[![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
+
 A powerful Home Assistant custom integration that visualizes your smart home as an interactive graph, revealing the hidden relationships between your entities, devices, areas, automations, groups, and zones.
 
 ## ✨ Key Features
@@ -145,3 +150,45 @@ bash tests/test_file_serving.sh
 ```
 
 See `/tests/README.md` for detailed testing documentation.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+### Development Setup
+1. Fork and clone the repository
+2. Copy to your HA `custom_components/` directory for testing
+3. Make your changes
+4. Run the test suite
+5. Submit a pull request
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🐛 Bug Reports & Feature Requests
+
+Please use the [GitHub Issues](https://github.com/jonducrou/ha_visualiser/issues) to report bugs or request features.
+
+## 🙏 Acknowledgments
+
+- Built on the excellent [vis.js](https://visjs.org/) visualization library
+- Inspired by the Home Assistant community's need for better entity relationship visualization
+- Thanks to all contributors and users who provided feedback and testing
+
+## 📊 Project Status
+
+This project is actively maintained and production-ready. Current version: **0.8.1**
+
+### Recent Updates
+- ✅ Comprehensive group support (light groups, switch groups, media player groups)
+- ✅ Advanced template parsing for complex Jinja2 templates  
+- ✅ Helper entity relationship detection (change-type helpers)
+- ✅ Cleaned up debug logging for better performance
+- ✅ Enhanced bidirectional relationship navigation
+
+### Roadmap
+- 🔄 Performance optimization for very large installations (>1000 entities)
+- 🔄 Dashboard entity relationships
+- 🔄 Custom relationship definitions
+- 🔄 Saved views and layouts
