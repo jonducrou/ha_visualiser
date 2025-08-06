@@ -48,17 +48,25 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         )
     ])
     
-    # Register the panel
-    await panel_custom.async_register_panel(
-        hass,
-        frontend_url_path="ha_visualiser",
-        webcomponent_name="ha-visualiser-panel",
-        sidebar_title="Entity Visualizer",
-        sidebar_icon="mdi:graph",
-        module_url="/hacsfiles/ha_visualiser/ha-visualiser-panel.js",
-        config={},
-        require_admin=False,
-    )
+    # Register the panel with defensive error handling
+    try:
+        await panel_custom.async_register_panel(
+            hass,
+            frontend_url_path="ha_visualiser",
+            webcomponent_name="ha-visualiser-panel",
+            sidebar_title="Entity Visualizer",
+            sidebar_icon="mdi:graph",
+            module_url="/hacsfiles/ha_visualiser/ha-visualiser-panel.js",
+            config={},
+            require_admin=False,
+        )
+        _LOGGER.debug("Panel registered successfully")
+    except ValueError as e:
+        if "Overwriting panel" in str(e):
+            _LOGGER.debug("Panel already registered, skipping registration")
+        else:
+            _LOGGER.error("Failed to register panel: %s", e)
+            raise
     
     _LOGGER.info("Home Assistant Entity Visualizer integration loaded successfully")
     _LOGGER.debug("Integration setup completed - panel and websocket handlers registered")
@@ -87,17 +95,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
         ])
         
-        # Register the panel
-        await panel_custom.async_register_panel(
-            hass,
-            frontend_url_path="ha_visualiser",
-            webcomponent_name="ha-visualiser-panel",
-            sidebar_title="Entity Visualizer",
-            sidebar_icon="mdi:graph",
-            module_url="/hacsfiles/ha_visualiser/ha-visualiser-panel.js",
-            config={},
-            require_admin=False,
-        )
+        # Register the panel with defensive error handling
+        try:
+            await panel_custom.async_register_panel(
+                hass,
+                frontend_url_path="ha_visualiser",
+                webcomponent_name="ha-visualiser-panel",
+                sidebar_title="Entity Visualizer",
+                sidebar_icon="mdi:graph",
+                module_url="/hacsfiles/ha_visualiser/ha-visualiser-panel.js",
+                config={},
+                require_admin=False,
+            )
+            _LOGGER.debug("Panel registered successfully")
+        except ValueError as e:
+            if "Overwriting panel" in str(e):
+                _LOGGER.debug("Panel already registered, skipping registration")
+            else:
+                _LOGGER.error("Failed to register panel: %s", e)
+                raise
     
     _LOGGER.info("Home Assistant Entity Visualizer integration loaded via config entry")
     _LOGGER.debug("Config entry setup completed - services available")
@@ -106,7 +122,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    # Clean up stored data
     if DOMAIN in hass.data:
         hass.data.pop(DOMAIN)
     
+    # Try to remove the panel (this helps with clean restarts)
+    try:
+        hass.components.frontend.async_remove_panel("ha_visualiser")
+        _LOGGER.debug("Panel removed successfully during unload")
+    except (AttributeError, KeyError):
+        # Panel wasn't registered or already removed
+        _LOGGER.debug("Panel was not registered or already removed")
+    except Exception as e:
+        # Log but don't fail unload for panel removal issues
+        _LOGGER.debug("Could not remove panel during unload: %s", e)
+    
+    _LOGGER.info("Home Assistant Entity Visualizer integration unloaded")
     return True

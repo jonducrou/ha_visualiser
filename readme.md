@@ -1,28 +1,34 @@
 # Home Assistant Entity Visualizer
 
-A powerful Home Assistant custom integration that visualizes your smart home as an interactive graph, revealing the hidden relationships between your entities, devices, areas, automations, and zones.
+A powerful Home Assistant custom integration that visualizes your smart home as an interactive graph, revealing the hidden relationships between your entities, devices, areas, automations, groups, and zones.
 
 ## ✨ Key Features
 
-### 🎨 **Clean, Modern Interface**
+### 🎨 **Advanced Interactive Interface**
 - **Clean Design**: Consistent rounded boxes with subtle light color palette
-- **Entity Icons**: Visual icons for each domain (💡 lights, 🔌 switches, 🤖 automations, etc.)
+- **Entity Icons**: Visual icons for each domain (💡 lights, 🔌 switches, 🤖 automations, etc.)  
 - **Focus Highlighting**: Enhanced visual feedback for the currently selected entity
-- **Minimal Edge Crossings**: Advanced layout algorithms for cleaner graph visualization
+- **Dual Layout Modes**: Hierarchical for simple graphs, force-directed for complex networks
+- **Layout Debug Panel**: Real-time layout parameter tuning with live preview
+- **Double-Click Navigation**: Smooth, intuitive entity exploration
 
 ### 🔍 **Comprehensive Relationship Detection**
 - **Device Relationships**: Physical device to entity mappings
-- **Area & Zone Hierarchies**: Spatial organization and containment
-- **Label Organization**: Home Assistant label-based groupings and classifications
-- **Automation Dependencies**: Complete trigger and control relationship chains
-- **Template References**: Template sensor/switch entity dependencies
-- **Symmetrical Navigation**: Bidirectional relationship discovery and visualization
+- **Area & Zone Hierarchies**: Spatial organization and containment with optional filtering
+- **Group Support**: Light groups, switch groups, media player groups, and traditional groups
+- **Label Organization**: Home Assistant label-based groupings and classifications  
+- **Automation Dependencies**: Complete trigger and control relationship chains with UUID resolution
+- **Template References**: Advanced parsing for complex multi-line Jinja2 templates
+- **Alert Monitoring**: Home Assistant alert entity relationships
+- **Bidirectional Navigation**: True symmetrical relationship discovery and visualization
 
 ### 🚀 **Advanced Visualization**
-- **Interactive Navigation**: Click any node to explore its neighborhood  
+- **Interactive Navigation**: Double-click any node to explore its neighborhood smoothly
 - **2-Level Depth**: Rich context showing extended relationship networks
-- **Adaptive Layouts**: Automatic algorithm selection based on graph complexity
-- **Search & Discovery**: Powerful search across entities, devices, areas, zones, and labels
+- **Intelligent Layout Selection**: Automatic hierarchical vs force-directed algorithm selection
+- **Area Filtering**: Toggle areas on/off to simplify or expand relationship views
+- **Search & Discovery**: Powerful search across entities, devices, areas, zones, groups, and labels
+- **Enhanced Edge Bundling**: Clean handling of bidirectional relationships with proper grouping
 - **Consistent Arrows**: Logical relationship directions (container → contained, actor → target)
 
 ### 🎯 **Smart Entity Management**
@@ -83,8 +89,12 @@ A powerful Home Assistant custom integration that visualizes your smart home as 
 
 ### **Advanced Features**
 - **2-Level Exploration**: See not just direct relationships but extended networks
+- **Layout Debugging**: Real-time layout parameter adjustment with JSON editor and live preview
+- **Area Filtering**: "Show Areas" checkbox to toggle area relationships on/off
+- **Layout Toggle**: Switch between hierarchical and force-directed layouts for optimal visualization
 - **Symmetrical Navigation**: Relationships work bidirectionally for complete context
-- **Adaptive Layouts**: Automatic optimization for different graph complexities
+- **Group Support**: Comprehensive support for all Home Assistant group types
+- **Enhanced Template Parsing**: Support for complex multi-line Jinja2 templates with advanced regex
 - **Real-time Updates**: Live reflection of changes in your HA setup
 
 ## 📋 Requirements
@@ -103,12 +113,15 @@ A powerful Home Assistant custom integration that visualizes your smart home as 
 
 ### **Supported Relationship Types**
 - **Device → Entity**: Physical device contains multiple entities
-- **Area → Device/Entity**: Spatial organization and room assignments
+- **Area → Device/Entity**: Spatial organization and room assignments (with filtering)
 - **Zone → Entity**: Geographic/proximity-based relationships
 - **Label → Entity/Device/Area**: Organizational labeling and classification
+- **Group → Entity**: Group containment (light groups, switch groups, media player groups)
+- **Entity → Group**: Group membership relationships (bidirectional)
 - **Entity → Automation**: Trigger relationships (state changes activate automations)
 - **Automation → Entity**: Control relationships (automations modify entity states)
 - **Template → Entity**: Dependency relationships (templates reference other entities)
+- **Alert → Entity**: Alert monitoring relationships
 
 ### **Performance**
 - **Lazy Loading**: Only loads neighborhoods on demand

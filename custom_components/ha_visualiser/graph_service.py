@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, List, Set
 from dataclasses import dataclass
 
@@ -82,9 +83,11 @@ class GraphService:
         edge_set = set()  # Track edges to prevent duplicates
         
         # Start with the target entity or device
+        _LOGGER.debug(f"Building neighborhood for {entity_id}")
         await self._add_entity_and_neighbors_with_distance(
             entity_id, nodes, edges, distances, edge_set, max_depth, 0, show_areas
         )
+        _LOGGER.debug(f"Graph complete: {len(nodes)} nodes, {len(edges)} edges")
         
         return {
             "nodes": list(nodes.values()),
@@ -148,14 +151,33 @@ class GraphService:
             if (query_lower in entity_id.lower() or 
                 query_lower in friendly_name.lower()):
                 
-                # For groups, check if they have any relationships before including
+                # For group-like entities, check if they have any relationships before including
                 domain = entity_id.split(".")[0]
-                if domain == "group":
-                    # Check if group has any member entities
-                    member_entities = state.attributes.get("entity_id", [])
-                    if not member_entities:
-                        _LOGGER.debug(f"Excluding empty group from search: {entity_id}")
-                        continue  # Skip groups with no members
+                group_domains = ["group", "light", "switch", "cover", "fan", "media_player", "climate"]
+                
+                if domain in group_domains:
+                    # Check if group-like entity has any member entities
+                    member_entities = []
+                    
+                    if domain == "group":
+                        member_entities = state.attributes.get("entity_id", [])
+                    elif domain == "light":
+                        light_entities = state.attributes.get("entity_id", [])
+                        lights_attr = state.attributes.get("lights", [])
+                        member_entities = light_entities + lights_attr
+                    elif domain in ["switch", "cover", "fan", "climate"]:
+                        entity_attr = state.attributes.get("entity_id", [])
+                        plural_attr = state.attributes.get(f"{domain}s", [])
+                        member_entities = entity_attr + plural_attr
+                    elif domain == "media_player":
+                        media_entities = state.attributes.get("entity_id", [])
+                        group_members = state.attributes.get("group_members", [])
+                        member_entities = media_entities + group_members
+                    
+                    # Only include if it's a real group with members or if it might be a group
+                    # (some groups might not have members at search time but still be valid)
+                    if not member_entities and domain == "group":
+                        continue  # Skip traditional groups with no members
                 
                 results.append({
                     "entity_id": entity_id,
@@ -667,6 +689,44 @@ class GraphService:
                 from_node, to_node = node_b, node_a  # label -> object
             label = "labelled"
             
+        elif relationship_type == "group_contains":
+            # Group -> Entity (Group contains Entity)
+            # Determine which is the group and which is the entity
+            if (node_a.startswith("group.") or 
+                node_a.startswith("light.") or 
+                node_a.startswith("switch.") or 
+                node_a.startswith("cover.") or 
+                node_a.startswith("fan.") or 
+                node_a.startswith("media_player.") or 
+                node_a.startswith("climate.")):
+                # Check if node_a is actually a group by seeing if it has group-like attributes
+                # For now, assume the first node in group domains is the group
+                from_node, to_node = node_a, node_b  # group -> entity
+            else:
+                from_node, to_node = node_b, node_a  # group -> entity
+            label = "contains"
+            
+        elif relationship_type == "group_contains_reverse":
+            # Entity -> Group relationship, but we want Group -> Entity direction
+            # Always reverse the direction for this relationship type
+            if (node_b.startswith("group.") or 
+                node_b.startswith("light.") or 
+                node_b.startswith("switch.") or 
+                node_b.startswith("cover.") or 
+                node_b.startswith("fan.") or 
+                node_b.startswith("media_player.") or 
+                node_b.startswith("climate.")):
+                from_node, to_node = node_b, node_a  # group -> entity
+            else:
+                from_node, to_node = node_a, node_b  # group -> entity
+            label = "contains"
+            
+        elif relationship_type == "helper_converts":
+            # Helper -> Original (Helper converts/proxies Original entity)
+            # The helper entity points to what it's converting/representing
+            from_node, to_node = node_a, node_b  # helper -> original
+            label = "converts"
+            
         else:
             # Default: use node priority to determine direction
             priority_a = get_node_priority(node_a)
@@ -887,15 +947,12 @@ class GraphService:
         # Handle device node relationships - show all entities on the device
         if entity_id.startswith("device:"):
             device_id = entity_id.replace("device:", "")
-            _LOGGER.debug(f"Finding entities for device: {device_id}")
             
             device_entities = entity_registry.async_entries_for_device(
                 self._entity_registry, device_id
             )
             
-            _LOGGER.debug(f"Found {len(device_entities)} entities on device {device_id}")
             for entity_entry in device_entities:
-                _LOGGER.debug(f"  Device entity: {entity_entry.entity_id}")
                 # Device contains entity: return entity with device_has relationship
                 related.append((entity_entry.entity_id, "device_has"))
             
@@ -905,7 +962,6 @@ class GraphService:
                 area = self._area_registry.async_get_area(device.area_id)
                 area_name = area.name if area else "Unknown Area"
                 area_node_id = f"area:{device.area_id}"
-                _LOGGER.debug(f"  Device is in area: {area_node_id}")
                 # Area contains device: return area with device_in_area relationship
                 related.append((area_node_id, "device_in_area"))
             
@@ -923,16 +979,13 @@ class GraphService:
         # Handle area node relationships - show all entities in the area
         if entity_id.startswith("area:"):
             area_id = entity_id.replace("area:", "")
-            _LOGGER.debug(f"Finding entities for area: {area_id}")
             
             # Find entities directly assigned to the area
             area_entities = entity_registry.async_entries_for_area(
                 self._entity_registry, area_id
             )
             
-            _LOGGER.debug(f"Found {len(area_entities)} entities directly in area {area_id}")
             for entity_entry in area_entities:
-                _LOGGER.debug(f"  Direct area entity: {entity_entry.entity_id}")
                 # Area contains entity: return entity with area_contains relationship
                 related.append((entity_entry.entity_id, "area_contains"))
             
@@ -942,20 +995,16 @@ class GraphService:
                 if device.area_id == area_id
             ]
             
-            _LOGGER.debug(f"Found {len(devices_in_area)} devices in area {area_id}")
             for device in devices_in_area:
                 # Add the device itself as a node that the area contains
                 device_node_id = f"device:{device.id}"
-                _LOGGER.debug(f"  Area contains device: {device_node_id}")
                 related.append((device_node_id, "area_contains_device"))
                 
                 # Also add entities on devices in this area (for completeness)
                 device_entities = entity_registry.async_entries_for_device(
                     self._entity_registry, device.id
                 )
-                _LOGGER.debug(f"  Device {device.name or device.id} has {len(device_entities)} entities")
                 for entity_entry in device_entities:
-                    _LOGGER.debug(f"    Device entity: {entity_entry.entity_id}")
                     # Area contains entity (via device): return entity with area_contains relationship
                     related.append((entity_entry.entity_id, "area_contains"))
             
@@ -1002,52 +1051,93 @@ class GraphService:
             return related
         
         # Handle group node relationships - show all entities in the group
-        if entity_id.startswith("group."):
-            _LOGGER.debug(f"Finding entities for group: {entity_id}")
+        # This includes traditional groups and domain-specific groups
+        group_domains = ["group", "light", "switch", "cover", "fan", "media_player", "climate"]
+        entity_domain = entity_id.split('.')[0]
+        
+        if entity_domain in group_domains:
             
             group_state = self.hass.states.get(entity_id)
             if group_state:
-                # Groups have an 'entity_id' attribute containing member entity IDs
-                member_entities = group_state.attributes.get("entity_id", [])
-                _LOGGER.debug(f"Found {len(member_entities)} entities in group {entity_id}")
+                member_entities = []
+                
+                # Traditional groups use 'entity_id' attribute
+                if entity_id.startswith("group."):
+                    member_entities = group_state.attributes.get("entity_id", [])
+                
+                # Light groups
+                elif entity_id.startswith("light."):
+                    light_entities = group_state.attributes.get("entity_id", [])
+                    member_entities.extend(light_entities)
+                    lights_attr = group_state.attributes.get("lights", [])
+                    member_entities.extend(lights_attr)
+                
+                # Switch groups
+                elif entity_id.startswith("switch."):
+                    switch_entities = group_state.attributes.get("entity_id", [])
+                    member_entities.extend(switch_entities)
+                    switches_attr = group_state.attributes.get("switches", [])
+                    member_entities.extend(switches_attr)
+                
+                # Cover groups
+                elif entity_id.startswith("cover."):
+                    cover_entities = group_state.attributes.get("entity_id", [])
+                    member_entities.extend(cover_entities)
+                    covers_attr = group_state.attributes.get("covers", [])
+                    member_entities.extend(covers_attr)
+                
+                # Fan groups
+                elif entity_id.startswith("fan."):
+                    fan_entities = group_state.attributes.get("entity_id", [])
+                    member_entities.extend(fan_entities)
+                    fans_attr = group_state.attributes.get("fans", [])
+                    member_entities.extend(fans_attr)
+                
+                # Media player groups
+                elif entity_id.startswith("media_player."):
+                    media_entities = group_state.attributes.get("entity_id", [])
+                    member_entities.extend(media_entities)
+                    players_attr = group_state.attributes.get("group_members", [])
+                    member_entities.extend(players_attr)
+                
+                # Climate groups
+                elif entity_id.startswith("climate."):
+                    climate_entities = group_state.attributes.get("entity_id", [])
+                    member_entities.extend(climate_entities)
+                
+                # Remove duplicates
+                member_entities = list(set(member_entities))
                 
                 for member_entity_id in member_entities:
-                    _LOGGER.debug(f"  Group member: {member_entity_id}")
                     # Group contains entity: return entity with group_contains relationship
                     related.append((member_entity_id, "group_contains"))
             
-            return related
+            # Don't return early - continue to check other relationship types
+            # including reverse group relationships
         
         # Handle label node relationships - show all entities/devices/areas with this label
         if entity_id.startswith("label:"):
             label_id = entity_id.replace("label:", "")
-            _LOGGER.debug(f"Finding items with label: {label_id}")
             
             label_entry = self._label_registry.async_get_label(label_id)
             if label_entry:
                 # Find all entities with this label
                 label_entities = self._get_entities_for_label(label_id)
-                _LOGGER.debug(f"Found {len(label_entities)} entities with label {label_entry.name}")
                 for entity_entry in label_entities:
-                    _LOGGER.debug(f"  Label entity: {entity_entry.entity_id}")
                     # Label labels entity: return entity with labelled relationship
                     related.append((entity_entry.entity_id, "labelled"))
                 
                 # Find all devices with this label
                 label_devices = self._get_devices_for_label(label_id)
-                _LOGGER.debug(f"Found {len(label_devices)} devices with label {label_entry.name}")
                 for device in label_devices:
                     device_node_id = f"device:{device.id}"
-                    _LOGGER.debug(f"  Label device: {device_node_id}")
                     # Label labels device: return device with labelled relationship
                     related.append((device_node_id, "labelled"))
                 
                 # Find all areas with this label
                 label_areas = self._get_areas_for_label(label_id)
-                _LOGGER.debug(f"Found {len(label_areas)} areas with label {label_entry.name}")
                 for area in label_areas:
                     area_node_id = f"area:{area.id}"
-                    _LOGGER.debug(f"  Label area: {area_node_id}")
                     # Label labels area: return area with labelled relationship
                     related.append((area_node_id, "labelled"))
             
@@ -1064,6 +1154,10 @@ class GraphService:
         # Alert-based relationships (do this for ALL entities, including alerts)
         alert_related = await self._find_alert_relationships(entity_id)
         related.extend(alert_related)
+        
+        # Helper/Proxy relationships (change type, input helpers, etc.)
+        helper_related = await self._find_helper_relationships(entity_id)
+        related.extend(helper_related)
         
         # Handle regular entity relationships
         entity_entry = self._entity_registry.async_get(entity_id)
@@ -1099,30 +1193,24 @@ class GraphService:
         """Find entities related through script triggers/actions."""
         related = []
         
-        _LOGGER.debug(f"Finding script relationships for: {entity_id}")
         
         # If this IS a script, find all entities it references
         if entity_id.startswith("script."):
-            _LOGGER.debug(f"Entity is script, finding referenced entities")
             
             # First, let's see what we can find about this script
             state = self.hass.states.get(entity_id)
             if state:
-                _LOGGER.debug(f"Script {entity_id} state: {state.state}")
-                _LOGGER.debug(f"Script {entity_id} attributes keys: {list(state.attributes.keys())}")
-                _LOGGER.debug(f"Script {entity_id} full attributes: {state.attributes}")
+                pass  # Script state available
             else:
-                _LOGGER.debug(f"No state found for script: {entity_id}")
+                pass  # No state available
             
             script_related = await self._find_script_referenced_entities(entity_id)
             related.extend(script_related)
-            _LOGGER.debug(f"Found {len(script_related)} script-referenced entities: {script_related}")
         
         # Scripts don't expose their configuration, but we can find automations that call this script
         # by checking all automations for script service calls
         
         if entity_id.startswith("script."):
-            _LOGGER.debug(f"Finding automations that call script: {entity_id}")
             
             # Check all automations to see which ones call this script
             automation_entities = [
@@ -1137,12 +1225,10 @@ class GraphService:
                 # Check if this script is in the automation's referenced entities
                 for referenced_entity, relationship_type in automation_related:
                     if referenced_entity == entity_id:
-                        _LOGGER.debug(f"Found automation {automation_id} calls script {entity_id}")
                         # Reverse the relationship: automation -> script becomes script <- automation
                         related.append((automation_id, "script_trigger"))
                         break
         
-        _LOGGER.debug(f"Found {len(related)} automations calling script {entity_id}")
         return related
 
     async def _find_script_referenced_entities(self, script_id: str) -> List[tuple[str, str]]:
@@ -1151,19 +1237,15 @@ class GraphService:
         
         state = self.hass.states.get(script_id)
         if not state:
-            _LOGGER.debug(f"No state found for script: {script_id}")
             return related
             
         script_config = state.attributes
-        _LOGGER.debug(f"Analyzing script {script_id} config keys: {script_config.keys()}")
-        _LOGGER.debug(f"Full script config: {script_config}")
         
         # Scripts have a "sequence" which contains actions
         sequence = script_config.get("sequence", [])
         
         # If no sequence in attributes, try accessing through script domain
         if not sequence:
-            _LOGGER.debug(f"No sequence found in script attributes, trying script domain")
             
             # Try to access script configuration through script component
             try:
@@ -1171,35 +1253,27 @@ class GraphService:
                 script_component = self.hass.data.get("script")
                 if script_component:
                     script_name = script_id.replace("script.", "")
-                    _LOGGER.debug(f"Script component found, looking for {script_name}")
                     
                     # Try to get the script entity from the component
                     if hasattr(script_component, 'entities'):
                         script_entity = script_component.entities.get(script_id)
                         if script_entity:
-                            _LOGGER.debug(f"Found script entity: {script_entity}")
                             if hasattr(script_entity, 'sequence'):
                                 sequence = script_entity.sequence
-                                _LOGGER.debug(f"Found sequence in script entity: {len(sequence)} actions")
                     
                     # Method 2: Try accessing as dict
                     if not sequence and isinstance(script_component, dict):
                         script_entity = script_component.get(script_name)
                         if script_entity:
-                            _LOGGER.debug(f"Found script in component dict: {script_entity}")
                             if hasattr(script_entity, 'sequence'):
                                 sequence = script_entity.sequence
-                                _LOGGER.debug(f"Found sequence in dict entity: {len(sequence)} actions")
                 
                 # Method 3: Try accessing through script domain services
                 if not sequence:
-                    _LOGGER.debug(f"Trying to access script config through services")
                     services = self.hass.services.async_services().get("script", {})
-                    _LOGGER.debug(f"Available script services: {list(services.keys())}")
                     
                 # Method 4: Check if script config is available through config entries
                 if not sequence:
-                    _LOGGER.debug(f"Checking hass.data keys: {list(self.hass.data.keys())}")
                     for key, value in self.hass.data.items():
                         if "script" in key.lower():
                             _LOGGER.debug(f"Found script-related data key: {key} = {type(value)}")
@@ -1841,7 +1915,6 @@ class GraphService:
 
     def _extract_entities_from_template_string_advanced(self, template_str: str) -> Set[str]:
         """Extract entity references from Jinja2 templates with comprehensive patterns."""
-        import re
         entities = set()
         
         if not isinstance(template_str, str):
@@ -1849,63 +1922,96 @@ class GraphService:
         
         _LOGGER.debug(f"Extracting entities from template: {template_str}")
         
-        # Common template patterns for entity references
+        # Normalize whitespace and newlines for multi-line templates
+        # This handles complex templates with line breaks and indentation
+        normalized_template = re.sub(r'\s+', ' ', template_str.strip())
+        _LOGGER.debug(f"Normalized template: {normalized_template}")
+        
+        # Enhanced patterns for entity references with flexible whitespace handling
         patterns = [
-            r"states\(['\"]([^'\"]+)['\"]\)",                    # states('entity.id')
-            r"state_attr\(['\"]([^'\"]+)['\"],",                # state_attr('entity.id', 'attr')
-            r"is_state\(['\"]([^'\"]+)['\"],",                  # is_state('entity.id', 'state')
-            r"states\.([a-z_]+\.[a-z0-9_]+)",                   # states.entity.id
-            r"device_attr\(['\"]([^'\"]+)['\"],",               # device_attr('entity.id', 'attr')
-            r"has_value\(['\"]([^'\"]+)['\"]\)",                # has_value('entity.id')
-            r"as_timestamp\(states\(['\"]([^'\"]+)['\"]\)\)",   # as_timestamp(states('entity.id'))
-            r"float\s*\+\s*states\(['\"]([^'\"]+)['\"]\)",      # float + states('entity.id')
-            r"states\(['\"]([^'\"]+)['\"]\)\s*\|\s*float",      # states('entity.id') | float
-            r"([a-z_]+\.[a-z0-9_]+(?:\.[a-z0-9_]+)*)",          # Direct entity.id references
+            # Core HA functions with flexible whitespace
+            r"states\s*\(\s*['\"]([^'\"]+)['\"]\s*\)",                           # states('entity.id')
+            r"state_attr\s*\(\s*['\"]([^'\"]+)['\"]\s*,",                       # state_attr('entity.id', 'attr')  
+            r"is_state\s*\(\s*['\"]([^'\"]+)['\"]\s*,",                         # is_state('entity.id', 'state')
+            r"device_attr\s*\(\s*['\"]([^'\"]+)['\"]\s*,",                      # device_attr('entity.id', 'attr')
+            r"has_value\s*\(\s*['\"]([^'\"]+)['\"]\s*\)",                       # has_value('entity.id')
+            
+            # Complex nested function calls with whitespace
+            r"as_timestamp\s*\(\s*states\s*\(\s*['\"]([^'\"]+)['\"]\s*\)\s*\)", # as_timestamp(states('entity.id'))
+            r"float\s*\(\s*states\s*\(\s*['\"]([^'\"]+)['\"]\s*\)\s*\)",        # float(states('entity.id'))
+            r"int\s*\(\s*states\s*\(\s*['\"]([^'\"]+)['\"]\s*\)\s*\)",          # int(states('entity.id'))
+            
+            # Mathematical operations with states
+            r"states\s*\(\s*['\"]([^'\"]+)['\"]\s*\)\s*\|\s*float",             # states('entity.id') | float
+            r"states\s*\(\s*['\"]([^'\"]+)['\"]\s*\)\s*\|\s*int",               # states('entity.id') | int
+            r"states\s*\(\s*['\"]([^'\"]+)['\"]\s*\)\s*\+",                     # states('entity.id') +
+            r"states\s*\(\s*['\"]([^'\"]+)['\"]\s*\)\s*\-",                     # states('entity.id') -
+            r"states\s*\(\s*['\"]([^'\"]+)['\"]\s*\)\s*\*",                     # states('entity.id') *
+            r"states\s*\(\s*['\"]([^'\"]+)['\"]\s*\)\s*/",                      # states('entity.id') /
+            
+            # Direct states.entity.id format (dot notation)
+            r"states\.([a-z_]+\.[a-z0-9_]+(?:\.[a-z0-9_]+)*)",                 # states.entity.id
+            
+            # Generic entity.id patterns (catch remaining references)  
+            r"([a-z_]+\.[a-z0-9_]+(?:\.[a-z0-9_]+)*)",                         # Direct entity.id references
         ]
         
-        for pattern in patterns:
-            matches = re.findall(pattern, template_str)
-            for match in matches:
-                # Convert states.entity.id format back to entity.id
-                if '.' not in match and pattern.startswith(r"states\."):
-                    # This was a states.entity_id pattern, need to reconstruct
-                    continue
-                
-                # For direct entity.id pattern, validate it looks like a real entity
-                if pattern.endswith(r"([a-z_]+\.[a-z0-9_]+(?:\.[a-z0-9_]+)*)"):
-                    # Only accept if it has a known entity domain and reasonable format
-                    if not self._is_likely_entity_id(match):
-                        continue
-                
-                entities.add(match)
-                _LOGGER.debug(f"Found entity via pattern {pattern}: {match}")
+        # Process both original and normalized templates to catch edge cases
+        for template_variant in [template_str, normalized_template]:
+            for pattern in patterns:
+                matches = re.findall(pattern, template_variant, re.IGNORECASE | re.MULTILINE)
+                for match in matches:
+                    # Handle different regex group structures
+                    entity_candidate = match if isinstance(match, str) else match[0] if match else None
+                    
+                    if entity_candidate and self._is_valid_entity_id(entity_candidate):
+                        entities.add(entity_candidate)
+                        _LOGGER.debug(f"Found entity from pattern '{pattern}': {entity_candidate}")
         
+        # Additional processing for complex multi-line templates  
+        # Look for entity patterns that might span line breaks in the original
+        multiline_patterns = [
+            r"states\s*\(\s*['\"]([^'\"]+)['\"]\s*\)[^}]*\|[^}]*float",         # Multi-line states() | float
+            r"as_timestamp\s*\([^)]*states\s*\(\s*['\"]([^'\"]+)['\"]\s*\)",    # Multi-line as_timestamp(states())
+        ]
+        
+        for pattern in multiline_patterns:
+            matches = re.findall(pattern, template_str, re.IGNORECASE | re.MULTILINE | re.DOTALL)
+            for match in matches:
+                entity_candidate = match if isinstance(match, str) else match[0] if match else None
+                if entity_candidate and self._is_valid_entity_id(entity_candidate):
+                    entities.add(entity_candidate)
+                    _LOGGER.debug(f"Found entity from multiline pattern: {entity_candidate}")
+        
+        _LOGGER.debug(f"Final extracted entities: {entities}")
         return entities
-    
-    def _is_likely_entity_id(self, entity_id: str) -> bool:
+
+    def _is_valid_entity_id(self, entity_id: str) -> bool:
         """Check if a string looks like a valid Home Assistant entity ID."""
-        if not entity_id or '.' not in entity_id:
+        if not entity_id or not isinstance(entity_id, str):
             return False
             
-        # Known Home Assistant domains
-        known_domains = {
-            'sensor', 'binary_sensor', 'switch', 'light', 'automation', 'script', 
-            'input_boolean', 'input_number', 'input_text', 'input_select', 'input_datetime',
-            'climate', 'cover', 'fan', 'media_player', 'camera', 'alarm_control_panel',
-            'device_tracker', 'person', 'zone', 'sun', 'weather', 'calendar', 'timer',
-            'counter', 'lock', 'vacuum', 'water_heater', 'humidifier', 'alert', 'template'
+        # Basic entity_id format: domain.entity_name
+        if not re.match(r'^[a-z_]+\.[a-z0-9_]+$', entity_id):
+            return False
+            
+        # Must have exactly one dot
+        if entity_id.count('.') != 1:
+            return False
+            
+        domain, entity_name = entity_id.split('.')
+        
+        # Domain must be at least 2 chars, entity name at least 1
+        if len(domain) < 2 or len(entity_name) < 1:
+            return False
+            
+        # Exclude obvious false positives
+        false_positives = {
+            'set.hourstodawn', 'int.60', 'float.batdawn',  # template variables
+            'var.i', 'let.j', 'tmp.value',                  # programming constructs
         }
         
-        parts = entity_id.split('.')
-        domain = parts[0]
-        
-        # Must be a known domain
-        if domain not in known_domains:
-            return False
-            
-        # Entity name should be reasonable (no spaces, special chars, etc.)
-        entity_name = '.'.join(parts[1:])
-        if not entity_name or not all(c.isalnum() or c in '_' for c in entity_name):
+        if entity_id in false_positives:
             return False
             
         return True
@@ -2006,16 +2112,22 @@ class GraphService:
         """Find template relationships by examining config entries."""
         related = []
         
+        # Only debug log for template entities to reduce noise
+        is_template_entity = entity_id.startswith(('binary_sensor.', 'sensor.', 'switch.', 'button.', 'number.', 'select.', 'text.'))
+        if is_template_entity:
+            _LOGGER.debug(f"Looking for template relationships for entity: {entity_id}")
+        
         try:
             # Get config entries for template domain
             config_entries = self.hass.config_entries.async_entries("template")
+            if is_template_entity:
+                _LOGGER.debug(f"Found {len(config_entries)} template config entries")
             
             for config_entry in config_entries:
                 if not config_entry.options:
                     continue
                     
                 template_data = config_entry.options
-                _LOGGER.debug(f"Template config entry: {template_data}")
                 
                 # Check different template types
                 template_type = template_data.get("template_type")
@@ -2025,8 +2137,25 @@ class GraphService:
                     template_name = template_data.get("name", "Unknown Template")
                     template_entity_id = f"{template_type}.{template_name.lower().replace(' ', '_')}"
                     
+                    # Check if this template is relevant to our entity
+                    is_relevant = (entity_id == template_entity_id or 
+                                   entity_id.startswith(f"{template_type}.") and 
+                                   template_name.lower().replace(' ', '_') in entity_id)
+                    
+                    if is_relevant and is_template_entity:
+                        _LOGGER.debug(f"Template config entry: {template_data}")
+                        _LOGGER.debug(f"Generated template entity ID: {template_entity_id} for name: {template_name}")
+                        
+                        # Also check what template entities actually exist
+                        all_template_entities = [eid for eid in self.hass.states.async_entity_ids() 
+                                               if eid.startswith(f"{template_type}.")]
+                        matching_entities = [eid for eid in all_template_entities 
+                                           if template_name.lower().replace(' ', '_') in eid.lower()]
+                        _LOGGER.debug(f"Actual {template_type} entities containing '{template_name.lower().replace(' ', '_')}': {matching_entities}")
+                    
                     # Check various template fields for entity references
                     template_fields = [
+                        "state",              # Direct state field for template entities
                         "value_template",
                         "state_template", 
                         "availability_template",
@@ -2040,14 +2169,31 @@ class GraphService:
                             # Parse template for entity references
                             referenced_entities = self._extract_entities_from_template_string_advanced(template_str)
                             
+                            if is_relevant and is_template_entity:
+                                _LOGGER.debug(f"Found template field '{field}' with content: {template_str[:100]}...")
+                                _LOGGER.debug(f"Extracted entities from {field}: {referenced_entities}")
+                            
                             if entity_id in referenced_entities:
-                                _LOGGER.debug(f"Found template relationship: {template_entity_id} uses {entity_id}")
+                                if is_template_entity:
+                                    _LOGGER.debug(f"Found template relationship: {template_entity_id} uses {entity_id}")
                                 related.append((template_entity_id, "template_uses"))
                             
                             # Also check reverse - if this IS the template entity, show what it depends on
                             if entity_id == template_entity_id:
+                                if is_template_entity:
+                                    _LOGGER.debug(f"This IS the template entity ({template_entity_id}), adding dependencies")
                                 for referenced_entity in referenced_entities:
-                                    _LOGGER.debug(f"Found template dependency: {entity_id} depends on {referenced_entity}")
+                                    if is_template_entity:
+                                        _LOGGER.debug(f"Found template dependency: {entity_id} depends on {referenced_entity}")
+                                    related.append((referenced_entity, "template_depends"))
+                            
+                            # IMPORTANT: Also check if entity_id might be this template entity 
+                            # even if generated ID doesn't match exactly
+                            if (template_str and entity_id.startswith(f"{template_type}.") and
+                                template_name.lower().replace(' ', '_') in entity_id.lower()):
+                                for referenced_entity in referenced_entities:
+                                    if is_template_entity:
+                                        _LOGGER.debug(f"Template dependency fuzzy match: {entity_id} depends on {referenced_entity}")
                                     related.append((referenced_entity, "template_depends"))
                                     
         except Exception as e:
@@ -2076,31 +2222,275 @@ class GraphService:
         return related
 
     async def _find_group_relationships(self, entity_id: str) -> List[tuple[str, str]]:
-        """Find groups that contain this entity."""
+        """Find group relationships for this entity."""
         related = []
         
-        _LOGGER.debug(f"Finding groups containing entity: {entity_id}")
+        group_domains = ["group", "light", "switch", "cover", "fan", "media_player", "climate"]
+        entity_domain = entity_id.split('.')[0]
         
-        # Find all group entities and check if they contain this entity
-        group_entities = [
-            eid for eid in self.hass.states.async_entity_ids() 
-            if eid.startswith("group.")
-        ]
+        # Part 1: If this IS a group entity, find what entities it contains
+        if entity_domain in group_domains:
+            group_state = self.hass.states.get(entity_id)
+            if group_state:
+                member_entities = []
+                
+                # Get member entities based on group type
+                if entity_id.startswith("group."):
+                    member_entities = group_state.attributes.get("entity_id", [])
+                elif entity_id.startswith("light."):
+                    light_entities = group_state.attributes.get("entity_id", [])
+                    member_entities.extend(light_entities)
+                    lights_attr = group_state.attributes.get("lights", [])
+                    member_entities.extend(lights_attr)
+                elif entity_id.startswith("switch."):
+                    switch_entities = group_state.attributes.get("entity_id", [])
+                    member_entities.extend(switch_entities)
+                    switches_attr = group_state.attributes.get("switches", [])
+                    member_entities.extend(switches_attr)
+                elif entity_id.startswith("cover."):
+                    cover_entities = group_state.attributes.get("entity_id", [])
+                    member_entities.extend(cover_entities)
+                    covers_attr = group_state.attributes.get("covers", [])
+                    member_entities.extend(covers_attr)
+                elif entity_id.startswith("fan."):
+                    fan_entities = group_state.attributes.get("entity_id", [])
+                    member_entities.extend(fan_entities)
+                    fans_attr = group_state.attributes.get("fans", [])
+                    member_entities.extend(fans_attr)
+                elif entity_id.startswith("media_player."):
+                    media_entities = group_state.attributes.get("entity_id", [])
+                    member_entities.extend(media_entities)
+                    players_attr = group_state.attributes.get("group_members", [])
+                    member_entities.extend(players_attr)
+                elif entity_id.startswith("climate."):
+                    climate_entities = group_state.attributes.get("entity_id", [])
+                    member_entities.extend(climate_entities)
+                
+                # Remove duplicates
+                member_entities = list(set(member_entities))
+                
+                if member_entities:
+                    _LOGGER.debug(f"Entity {entity_id} is a {entity_domain} group containing {len(member_entities)} entities: {member_entities}")
+                    for member_entity_id in member_entities:
+                        # Group contains entity: return entity with group_contains relationship
+                        related.append((member_entity_id, "group_contains"))
         
-        for group_id in group_entities:
-            group_state = self.hass.states.get(group_id)
+        # Part 2: Find groups that contain this entity (for reverse relationships)  
+        # This works for ALL entities, including groups that might be in other groups
+        _LOGGER.debug(f"🔄 PART 2: Finding groups containing entity: {entity_id}")
+        
+        # Special debugging for our test case
+        if entity_id == "light.a_test_switch":
+            pass  # Debug case
+        
+        # Find all group-like entities that can contain other entities
+        all_group_candidates = []
+        
+        for domain in group_domains:
+            domain_entities = [
+                eid for eid in self.hass.states.async_entity_ids() 
+                if eid.startswith(f"{domain}.")
+            ]
+            all_group_candidates.extend(domain_entities)
+        
+        # Add debugging to see what groups we're checking  
+        if entity_id.startswith(('light.', 'switch.', 'sensor.')):  # Common entity types
+            _LOGGER.debug(f"Checking {len(all_group_candidates)} group candidates for entity {entity_id}")
+            
+        # Special debugging for the specific case you mentioned
+        if entity_id == "light.a_test_switch":
+            light_candidates = [c for c in all_group_candidates if c.startswith('light.')]
+
+        for group_candidate_id in all_group_candidates:
+            group_state = self.hass.states.get(group_candidate_id)
             if not group_state:
                 continue
-                
-            # Groups have an 'entity_id' attribute containing member entity IDs
-            member_entities = group_state.attributes.get("entity_id", [])
             
-            if entity_id in member_entities:
-                _LOGGER.debug(f"Found entity {entity_id} in group {group_id}")
-                # Entity is in group: return group with group_contains relationship
-                related.append((group_id, "group_contains"))
+            # Check various attributes that indicate group membership
+            member_entities = []
+            
+            # Traditional groups use 'entity_id' attribute
+            if group_candidate_id.startswith("group."):
+                member_entities = group_state.attributes.get("entity_id", [])
+            
+            # Light groups use 'entity_id' attribute 
+            elif group_candidate_id.startswith("light."):
+                # Light groups created through UI have 'entity_id' attribute
+                light_entities = group_state.attributes.get("entity_id", [])
+                member_entities.extend(light_entities)
+                
+                # Some light groups might use 'lights' attribute
+                lights_attr = group_state.attributes.get("lights", [])
+                member_entities.extend(lights_attr)
+                
+                # Debug for light groups specifically
+                if entity_id.startswith('light.') and member_entities:
+                    _LOGGER.debug(f"Light group {group_candidate_id} has members: {member_entities}")
+                
+                # Special debugging for light.light_group
+                if group_candidate_id == "light.light_group":
+                    pass  # Debug case
+            
+            # Switch groups
+            elif group_candidate_id.startswith("switch."):
+                switch_entities = group_state.attributes.get("entity_id", [])
+                member_entities.extend(switch_entities)
+                
+                # Some switch groups might use 'switches' attribute
+                switches_attr = group_state.attributes.get("switches", [])
+                member_entities.extend(switches_attr)
+            
+            # Cover groups
+            elif group_candidate_id.startswith("cover."):
+                cover_entities = group_state.attributes.get("entity_id", [])
+                member_entities.extend(cover_entities)
+                
+                covers_attr = group_state.attributes.get("covers", [])
+                member_entities.extend(covers_attr)
+            
+            # Fan groups
+            elif group_candidate_id.startswith("fan."):
+                fan_entities = group_state.attributes.get("entity_id", [])
+                member_entities.extend(fan_entities)
+                
+                fans_attr = group_state.attributes.get("fans", [])
+                member_entities.extend(fans_attr)
+            
+            # Media player groups
+            elif group_candidate_id.startswith("media_player."):
+                media_entities = group_state.attributes.get("entity_id", [])
+                member_entities.extend(media_entities)
+                
+                # Sonos and other systems might use different attributes
+                players_attr = group_state.attributes.get("group_members", [])
+                member_entities.extend(players_attr)
+            
+            # Climate groups
+            elif group_candidate_id.startswith("climate."):
+                climate_entities = group_state.attributes.get("entity_id", [])
+                member_entities.extend(climate_entities)
+            
+            # Remove duplicates and check if our entity is in the group
+            member_entities = list(set(member_entities))
+            
+            # Debug what we found for this group
+            if entity_id.startswith(('light.', 'switch.', 'sensor.')) and member_entities:
+                _LOGGER.debug(f"Group {group_candidate_id} has members: {member_entities}, checking if {entity_id} is in list")
+            
+            # Avoid self-references (group shouldn't contain itself)
+            if entity_id in member_entities and entity_id != group_candidate_id:
+                _LOGGER.debug(f"✅ Found entity {entity_id} in {group_candidate_id.split('.')[0]} group {group_candidate_id}")
+                # Entity is in group: show group pointing to entity (group → entity)
+                # Use negative relationship to indicate reverse direction 
+                related.append((group_candidate_id, "group_contains_reverse"))
+            elif entity_id.startswith(('light.', 'switch.', 'sensor.')) and member_entities:
+                _LOGGER.debug(f"❌ Entity {entity_id} NOT found in {group_candidate_id} members: {member_entities}")
         
         _LOGGER.debug(f"Found {len(related)} groups containing entity {entity_id}")
+        return related
+
+    async def _find_helper_relationships(self, entity_id: str) -> List[tuple[str, str]]:
+        """Find helper/proxy relationships (change type, input helpers, etc.)."""
+        related = []
+        
+        # Only debug for light/switch entities to reduce noise
+        is_light_or_switch = entity_id.startswith(('light.', 'switch.'))
+        if is_light_or_switch:
+            pass  # Debug case
+        
+        # Get the entity's state to examine its attributes
+        state = self.hass.states.get(entity_id)
+        if not state:
+            return related
+        
+        # Check for "change type" / conversion helper indicators
+        _LOGGER.debug(f"Checking helper relationships for {entity_id}")
+        attributes = state.attributes
+        
+        # Debug all attributes for light/switch entities
+        if is_light_or_switch:
+            pass  # Debug case
+        
+        # Method 1: Check for original_entity or source_entity attributes
+        original_entity = attributes.get("original_entity")
+        source_entity = attributes.get("source_entity")
+        wrapped_entity = attributes.get("wrapped_entity")  # Some integrations use this
+        
+        if original_entity:
+            if is_light_or_switch:
+                pass  # Debug case
+            related.append((original_entity, "helper_converts"))
+            
+        if source_entity:
+            if is_light_or_switch:
+                pass  # Debug case
+            related.append((source_entity, "helper_converts"))
+            
+        if wrapped_entity:
+            if is_light_or_switch:
+                pass  # Debug case
+            related.append((wrapped_entity, "helper_converts"))
+        
+        # Method 2: Check for common helper patterns in entity_id
+        # Many change-type helpers follow patterns like domain.original_name -> different_domain.original_name
+        if "_" in entity_id or "original" in entity_id.lower():
+            # Try to find potential source entities with similar names
+            entity_domain = entity_id.split(".")[0]
+            entity_name = entity_id.split(".", 1)[1]
+            
+            # Look for entities with the same name but different domains
+            all_entities = self.hass.states.async_entity_ids()
+            potential_sources = []
+            
+            for other_entity_id in all_entities:
+                other_domain = other_entity_id.split(".")[0]
+                other_name = other_entity_id.split(".", 1)[1]
+                
+                # Skip self
+                if other_entity_id == entity_id:
+                    continue
+                
+                # Look for same name, different domain
+                if (other_name == entity_name and other_domain != entity_domain):
+                    potential_sources.append(other_entity_id)
+                
+                # Look for similar names (common patterns: switch.something -> light.something)
+                name_similarity_patterns = [
+                    entity_name.replace("_light", "").replace("_switch", ""),
+                    entity_name.replace("light_", "").replace("switch_", ""),
+                ]
+                
+                for pattern in name_similarity_patterns:
+                    if (other_name == pattern or 
+                        other_name == f"{pattern}_switch" or 
+                        other_name == f"{pattern}_light" or
+                        other_name == f"switch_{pattern}" or
+                        other_name == f"light_{pattern}"):
+                        if other_entity_id not in potential_sources:
+                            potential_sources.append(other_entity_id)
+            
+            # Add debug info for potential matches
+            if potential_sources:
+                # For now, add all potential sources - we can refine this logic
+                for source in potential_sources:
+                    related.append((source, "helper_converts"))
+        
+        # Method 3: Check for entity registry hints
+        entity_entry = self._entity_registry.async_get(entity_id)
+        if entity_entry and entity_entry.original_name:
+            pass  # Could use this to find relationships, but need more context
+        
+        # Method 4: Check specific helper domains
+        helper_domains = ["input_boolean", "input_number", "input_text", "input_select", "input_datetime"]
+        entity_domain = entity_id.split(".")[0]
+        
+        if entity_domain in helper_domains:
+            # This is a helper entity - look for automations/scripts that use it
+            # Helper relationships are typically found through automation/template analysis
+            # which we already handle elsewhere
+            pass
+        
+        _LOGGER.debug(f"Found {len(related)} helper relationships for entity {entity_id}")
         return related
 
     def _entity_referenced_in_config(self, entity_id: str, config_list: List[Dict[str, Any]]) -> bool:
