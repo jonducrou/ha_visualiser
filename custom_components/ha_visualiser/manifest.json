@@ -3,7 +3,7 @@
   "name": "Entity Visualizer",
   "codeowners": ["@jonducrou"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["http"],
   "documentation": "https://github.com/jonducrou/ha_visualiser",
   "integration_type": "service",
   "iot_class": "local_polling",

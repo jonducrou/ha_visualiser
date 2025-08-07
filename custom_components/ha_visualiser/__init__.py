@@ -9,6 +9,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components import panel_custom
+import homeassistant.helpers.config_validation as cv
+import voluptuous as vol
 
 from .const import DOMAIN
 from .graph_service import GraphService
@@ -20,6 +22,9 @@ _LOGGER = logging.getLogger(__name__)
 _LOGGER.info("ha_visualiser __init__.py module loaded")
 
 PLATFORMS: list[str] = []
+
+# Configuration schema - empty since this integration has no YAML config
+CONFIG_SCHEMA = vol.Schema({DOMAIN: cv.empty_config_schema}, extra=vol.ALLOW_EXTRA)
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
