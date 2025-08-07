@@ -7,6 +7,16 @@
 
 A powerful Home Assistant custom integration that visualizes your smart home as an interactive graph, revealing the hidden relationships between your entities, devices, areas, automations, groups, and zones.
 
+## 📸 Screenshots
+
+### Interactive Network Visualization
+![Home Assistant Entity Visualizer - En Suite Bathroom](images/demo-en_suite.png)
+*Visualizing relationships in an en suite bathroom setup - showing devices, entities, areas, and their connections*
+
+### Complex Entity Relationships  
+![Home Assistant Entity Visualizer - Solar System](images/demo-solar.png)
+*Exploring solar system entities with templates, sensors, and automation relationships*
+
 ## ✨ Key Features
 
 ### 🎨 **Advanced Interactive Interface**
