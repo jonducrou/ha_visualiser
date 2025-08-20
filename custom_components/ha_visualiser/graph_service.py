@@ -1067,10 +1067,33 @@ class GraphService:
                 
                 # Light groups
                 elif entity_id.startswith("light."):
+                    # Standard entity_id attribute
                     light_entities = group_state.attributes.get("entity_id", [])
                     member_entities.extend(light_entities)
+                    
+                    # Alternative attributes that group helpers might use
                     lights_attr = group_state.attributes.get("lights", [])
                     member_entities.extend(lights_attr)
+                    
+                    # Some light groups might use different attributes
+                    group_members = group_state.attributes.get("group_members", [])
+                    member_entities.extend(group_members)
+                    
+                    # Light helper-specific attributes
+                    light_list = group_state.attributes.get("light_list", [])
+                    member_entities.extend(light_list)
+                    
+                    # Debug logging for empty light groups
+                    all_attrs = group_state.attributes
+                    if not member_entities and all_attrs:
+                        _LOGGER.debug(f"Light group {entity_id} has no members found. All attributes: {list(all_attrs.keys())}")
+                        # Check for any attribute that might contain entity IDs
+                        for attr_name, attr_value in all_attrs.items():
+                            if isinstance(attr_value, list) and attr_value:
+                                # Look for attributes that contain entity-like strings
+                                if any(isinstance(item, str) and '.' in item for item in attr_value):
+                                    _LOGGER.debug(f"Potential entity list found in attribute '{attr_name}': {attr_value}")
+                                    member_entities.extend([item for item in attr_value if isinstance(item, str) and '.' in item])
                 
                 # Switch groups
                 elif entity_id.startswith("switch."):
@@ -1078,6 +1101,21 @@ class GraphService:
                     member_entities.extend(switch_entities)
                     switches_attr = group_state.attributes.get("switches", [])
                     member_entities.extend(switches_attr)
+                    
+                    # Additional switch group attributes
+                    group_members = group_state.attributes.get("group_members", [])
+                    member_entities.extend(group_members)
+                    
+                    # Debug logging for empty switch groups
+                    if not member_entities:
+                        all_attrs = group_state.attributes
+                        _LOGGER.debug(f"Switch group {entity_id} has no members found. All attributes: {list(all_attrs.keys())}")
+                        # Check for any attribute that might contain entity IDs
+                        for attr_name, attr_value in all_attrs.items():
+                            if isinstance(attr_value, list) and attr_value:
+                                if any(isinstance(item, str) and '.' in item for item in attr_value):
+                                    _LOGGER.debug(f"Potential entity list found in attribute '{attr_name}': {attr_value}")
+                                    member_entities.extend([item for item in attr_value if isinstance(item, str) and '.' in item])
                 
                 # Cover groups
                 elif entity_id.startswith("cover."):
@@ -1793,7 +1831,7 @@ class GraphService:
                 elif isinstance(target_entity_id, list):
                     entities.update(target_entity_id)
                     
-            # Check device_id references and resolve to entities
+            # Check device_id references - for device triggers, use device node
             device_id = config.get("device_id")
             if device_id:
                 # If there's both device_id and entity_id, prioritize the specific entity
@@ -1805,14 +1843,16 @@ class GraphService:
                         entities.add(resolved_entity_id)
                         _LOGGER.debug(f"Found specific entity {resolved_entity_id} on device {device_id}")
                     else:
-                        # UUID resolution failed, fall back to all device entities
-                        device_entities = self._get_entities_for_device(device_id)
-                        entities.update(device_entities)
-                        _LOGGER.debug(f"Could not resolve entity UUID {specific_entity_id}, using all device entities: {device_entities}")
+                        # UUID resolution failed, but this is likely a device trigger
+                        # Create relationship to the device itself instead of all device entities
+                        device_node_id = f"device:{device_id}"
+                        entities.add(device_node_id)
+                        _LOGGER.debug(f"Could not resolve entity UUID {specific_entity_id}, using device node: {device_node_id}")
                 else:
-                    # No specific entity, use all device entities
-                    device_entities = self._get_entities_for_device(device_id)
-                    entities.update(device_entities)
+                    # No specific entity, this is a device trigger - use device node
+                    device_node_id = f"device:{device_id}"
+                    entities.add(device_node_id)
+                    _LOGGER.debug(f"Found device trigger for device {device_id}, using device node: {device_node_id}")
                 
             # Check area_id references and resolve to entities  
             area_id = config.get("area_id")
@@ -2238,15 +2278,53 @@ class GraphService:
                 if entity_id.startswith("group."):
                     member_entities = group_state.attributes.get("entity_id", [])
                 elif entity_id.startswith("light."):
+                    # Standard entity_id attribute
                     light_entities = group_state.attributes.get("entity_id", [])
                     member_entities.extend(light_entities)
+                    
+                    # Alternative attributes that group helpers might use
                     lights_attr = group_state.attributes.get("lights", [])
                     member_entities.extend(lights_attr)
+                    
+                    # Some light groups might use different attributes
+                    group_members = group_state.attributes.get("group_members", [])
+                    member_entities.extend(group_members)
+                    
+                    # Light helper-specific attributes
+                    light_list = group_state.attributes.get("light_list", [])
+                    member_entities.extend(light_list)
+                    
+                    # Debug logging for empty light groups
+                    all_attrs = group_state.attributes
+                    if not member_entities and all_attrs:
+                        _LOGGER.debug(f"Light group {entity_id} has no members found in _find_group_relationships. All attributes: {list(all_attrs.keys())}")
+                        # Check for any attribute that might contain entity IDs
+                        for attr_name, attr_value in all_attrs.items():
+                            if isinstance(attr_value, list) and attr_value:
+                                # Look for attributes that contain entity-like strings
+                                if any(isinstance(item, str) and '.' in item for item in attr_value):
+                                    _LOGGER.debug(f"Potential entity list found in attribute '{attr_name}': {attr_value}")
+                                    member_entities.extend([item for item in attr_value if isinstance(item, str) and '.' in item])
                 elif entity_id.startswith("switch."):
                     switch_entities = group_state.attributes.get("entity_id", [])
                     member_entities.extend(switch_entities)
                     switches_attr = group_state.attributes.get("switches", [])
                     member_entities.extend(switches_attr)
+                    
+                    # Additional switch group attributes
+                    group_members = group_state.attributes.get("group_members", [])
+                    member_entities.extend(group_members)
+                    
+                    # Debug logging for empty switch groups
+                    if not member_entities:
+                        all_attrs = group_state.attributes
+                        _LOGGER.debug(f"Switch group {entity_id} has no members found in _find_group_relationships. All attributes: {list(all_attrs.keys())}")
+                        # Check for any attribute that might contain entity IDs
+                        for attr_name, attr_value in all_attrs.items():
+                            if isinstance(attr_value, list) and attr_value:
+                                if any(isinstance(item, str) and '.' in item for item in attr_value):
+                                    _LOGGER.debug(f"Potential entity list found in attribute '{attr_name}': {attr_value}")
+                                    member_entities.extend([item for item in attr_value if isinstance(item, str) and '.' in item])
                 elif entity_id.startswith("cover."):
                     cover_entities = group_state.attributes.get("entity_id", [])
                     member_entities.extend(cover_entities)
@@ -2315,15 +2393,34 @@ class GraphService:
             
             # Light groups use 'entity_id' attribute 
             elif group_candidate_id.startswith("light."):
-                # Light groups created through UI have 'entity_id' attribute
+                # Standard entity_id attribute
                 light_entities = group_state.attributes.get("entity_id", [])
                 member_entities.extend(light_entities)
                 
-                # Some light groups might use 'lights' attribute
+                # Alternative attributes that group helpers might use
                 lights_attr = group_state.attributes.get("lights", [])
                 member_entities.extend(lights_attr)
                 
-                # Debug for light groups specifically
+                # Some light groups might use different attributes
+                group_members = group_state.attributes.get("group_members", [])
+                member_entities.extend(group_members)
+                
+                # Light helper-specific attributes
+                light_list = group_state.attributes.get("light_list", [])
+                member_entities.extend(light_list)
+                
+                # Debug for light groups specifically and check for unknown attributes
+                all_attrs = group_state.attributes
+                if not member_entities and all_attrs:
+                    _LOGGER.debug(f"Light group {group_candidate_id} has no members found in reverse lookup. All attributes: {list(all_attrs.keys())}")
+                    # Check for any attribute that might contain entity IDs
+                    for attr_name, attr_value in all_attrs.items():
+                        if isinstance(attr_value, list) and attr_value:
+                            # Look for attributes that contain entity-like strings
+                            if any(isinstance(item, str) and '.' in item for item in attr_value):
+                                _LOGGER.debug(f"Potential entity list found in attribute '{attr_name}': {attr_value}")
+                                member_entities.extend([item for item in attr_value if isinstance(item, str) and '.' in item])
+                
                 if entity_id.startswith('light.') and member_entities:
                     _LOGGER.debug(f"Light group {group_candidate_id} has members: {member_entities}")
                 
@@ -2339,6 +2436,21 @@ class GraphService:
                 # Some switch groups might use 'switches' attribute
                 switches_attr = group_state.attributes.get("switches", [])
                 member_entities.extend(switches_attr)
+                
+                # Additional switch group attributes
+                group_members = group_state.attributes.get("group_members", [])
+                member_entities.extend(group_members)
+                
+                # Debug logging for empty switch groups in reverse lookup
+                if not member_entities:
+                    all_attrs = group_state.attributes
+                    _LOGGER.debug(f"Switch group {group_candidate_id} has no members found in reverse lookup. All attributes: {list(all_attrs.keys())}")
+                    # Check for any attribute that might contain entity IDs
+                    for attr_name, attr_value in all_attrs.items():
+                        if isinstance(attr_value, list) and attr_value:
+                            if any(isinstance(item, str) and '.' in item for item in attr_value):
+                                _LOGGER.debug(f"Potential entity list found in attribute '{attr_name}': {attr_value}")
+                                member_entities.extend([item for item in attr_value if isinstance(item, str) and '.' in item])
             
             # Cover groups
             elif group_candidate_id.startswith("cover."):
