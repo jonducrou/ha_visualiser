@@ -188,14 +188,19 @@ Please use the [GitHub Issues](https://github.com/jonducrou/ha_visualiser/issues
 
 ## 📊 Project Status
 
-This project is actively maintained and production-ready. Current version: **0.8.1**
+This project is actively maintained and production-ready. Current version: **0.8.2**
 
 ### Recent Updates
+- 🐛 **Bug Fixes (v0.8.2)**: Fixed device trigger automation relationships and enhanced group helper detection
 - ✅ Comprehensive group support (light groups, switch groups, media player groups)
 - ✅ Advanced template parsing for complex Jinja2 templates  
 - ✅ Helper entity relationship detection (change-type helpers)
 - ✅ Cleaned up debug logging for better performance
 - ✅ Enhanced bidirectional relationship navigation
+
+### Latest Bug Fixes (v0.8.2)
+- **Device Triggers (#1)**: Device triggers in automations now properly show device relationships instead of cluttering with all device entities
+- **Group Helper Contents (#2)**: Enhanced group helper detection with comprehensive attribute checking and debug logging for UI-created groups
 
 ### Roadmap
 - 🔄 Performance optimization for very large installations (>1000 entities)
