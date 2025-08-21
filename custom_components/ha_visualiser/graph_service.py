@@ -1509,6 +1509,7 @@ class GraphService:
         scene_name = state.attributes.get("friendly_name", scene_id)
         _LOGGER.debug(f"Scene name: {scene_name}")
         _LOGGER.debug(f"Scene config keys: {list(scene_config.keys()) if scene_config else 'No config'}")
+        _LOGGER.debug(f"Scene attributes: {list(state.attributes.keys())}")
         
         # Extract entities from scene configuration
         entities_controlled = self._extract_entities_from_scene_config(scene_config)
@@ -1519,10 +1520,26 @@ class GraphService:
         # Also check for entities stored directly in attributes
         entities_in_scene = state.attributes.get("entities", {})
         if entities_in_scene:
+            _LOGGER.debug(f"Scene has 'entities' attribute with {len(entities_in_scene)} items")
             for entity_id in entities_in_scene:
                 if self._is_valid_entity_id(entity_id):
                     _LOGGER.debug(f"Found scene entity: {scene_name} -> {entity_id}")
                     related.append((entity_id, "scene_controls"))
+        
+        # Check additional attribute formats that might contain entity data
+        for attr_name in ["entity_id", "targets", "entity_ids"]:
+            if attr_name in state.attributes:
+                attr_value = state.attributes[attr_name]
+                _LOGGER.debug(f"Scene has '{attr_name}' attribute: {attr_value}")
+                if isinstance(attr_value, list):
+                    for entity_id in attr_value:
+                        if self._is_valid_entity_id(entity_id):
+                            _LOGGER.debug(f"Found scene entity from '{attr_name}': {scene_name} -> {entity_id}")
+                            related.append((entity_id, "scene_controls"))
+        
+        # If still no entities found, log all attributes for debugging
+        if not related:
+            _LOGGER.warning(f"Scene {scene_name} has no entities found. All attributes: {state.attributes}")
         
         _LOGGER.debug(f"Total entities found for {scene_name}: {len(related)}")
         return related
@@ -2213,19 +2230,53 @@ class GraphService:
         if not scene_config:
             return entities
         
-        # Check entities dict
+        # Check entities dict (most common format)
         scene_entities = scene_config.get("entities", {})
         if isinstance(scene_entities, dict):
             for entity_id in scene_entities.keys():
                 if self._is_valid_entity_id(entity_id):
                     entities.add(entity_id)
+                elif '.' not in entity_id:
+                    # Might be a UUID, try to resolve it
+                    resolved_id = self._resolve_entity_uuid(entity_id)
+                    if resolved_id and self._is_valid_entity_id(resolved_id):
+                        entities.add(resolved_id)
         
-        # Check snapshot data
+        # Check snapshot data (created by scene.create service)
         snapshot = scene_config.get("snapshot", {})
         if isinstance(snapshot, dict):
             for entity_id in snapshot.keys():
                 if self._is_valid_entity_id(entity_id):
                     entities.add(entity_id)
+                elif '.' not in entity_id:
+                    # Might be a UUID, try to resolve it
+                    resolved_id = self._resolve_entity_uuid(entity_id)
+                    if resolved_id and self._is_valid_entity_id(resolved_id):
+                        entities.add(resolved_id)
+        
+        # Check entity_data (alternative format used by some integrations)
+        entity_data = scene_config.get("entity_data", {})
+        if isinstance(entity_data, dict):
+            for entity_id in entity_data.keys():
+                if self._is_valid_entity_id(entity_id):
+                    entities.add(entity_id)
+                elif '.' not in entity_id:
+                    # Might be a UUID, try to resolve it
+                    resolved_id = self._resolve_entity_uuid(entity_id)
+                    if resolved_id and self._is_valid_entity_id(resolved_id):
+                        entities.add(resolved_id)
+        
+        # Check states (alternative format)
+        states = scene_config.get("states", {})
+        if isinstance(states, dict):
+            for entity_id in states.keys():
+                if self._is_valid_entity_id(entity_id):
+                    entities.add(entity_id)
+                elif '.' not in entity_id:
+                    # Might be a UUID, try to resolve it
+                    resolved_id = self._resolve_entity_uuid(entity_id)
+                    if resolved_id and self._is_valid_entity_id(resolved_id):
+                        entities.add(resolved_id)
         
         return entities
 

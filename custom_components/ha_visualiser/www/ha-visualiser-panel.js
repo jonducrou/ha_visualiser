@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.8.4: Added native HA entity dialogs, removed debug panel');
+    console.log('HA Visualiser Panel v0.8.5: Improved scene entity relationship detection');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
