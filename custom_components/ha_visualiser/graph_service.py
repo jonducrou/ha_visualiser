@@ -565,6 +565,8 @@ class GraphService:
                 return 4  # Automations have specific trigger/control semantics
             elif node_id.startswith("script."):
                 return 4  # Scripts have specific trigger/control semantics (same as automations)
+            elif node_id.startswith("scene."):
+                return 4  # Scenes have specific control semantics (same as automations/scripts)
             else:
                 return 5  # Regular entities
         
@@ -681,6 +683,14 @@ class GraphService:
                 from_node, to_node = node_a, node_b  # entity -> alert that depends on it
             label = "alerts"
             
+        elif relationship_type == "scene_controls":
+            # Scene -> Entity (Scene controls Entity state)
+            if node_a.startswith("scene."):
+                from_node, to_node = node_a, node_b  # scene -> entity it controls
+            else:
+                from_node, to_node = node_b, node_a  # scene -> entity it controls
+            label = "controls"
+            
         elif relationship_type == "labelled":
             # Label -> Object (Label labels Object)
             if node_a.startswith("label:"):
@@ -698,13 +708,18 @@ class GraphService:
                 node_a.startswith("cover.") or 
                 node_a.startswith("fan.") or 
                 node_a.startswith("media_player.") or 
-                node_a.startswith("climate.")):
+                node_a.startswith("climate.") or 
+                node_a.startswith("scene.")):
                 # Check if node_a is actually a group by seeing if it has group-like attributes
                 # For now, assume the first node in group domains is the group
                 from_node, to_node = node_a, node_b  # group -> entity
             else:
                 from_node, to_node = node_b, node_a  # group -> entity
-            label = "contains"
+            # Different label for scenes vs groups
+            if from_node.startswith("scene."):
+                label = "controls"
+            else:
+                label = "contains"
             
         elif relationship_type == "group_contains_reverse":
             # Entity -> Group relationship, but we want Group -> Entity direction
@@ -715,11 +730,16 @@ class GraphService:
                 node_b.startswith("cover.") or 
                 node_b.startswith("fan.") or 
                 node_b.startswith("media_player.") or 
-                node_b.startswith("climate.")):
+                node_b.startswith("climate.") or 
+                node_b.startswith("scene.")):
                 from_node, to_node = node_b, node_a  # group -> entity
             else:
                 from_node, to_node = node_a, node_b  # group -> entity
-            label = "contains"
+            # Different label for scenes vs groups
+            if from_node.startswith("scene."):
+                label = "controls"
+            else:
+                label = "contains"
             
         elif relationship_type == "helper_converts":
             # Helper -> Original (Helper converts/proxies Original entity)
@@ -1143,6 +1163,22 @@ class GraphService:
                     climate_entities = group_state.attributes.get("entity_id", [])
                     member_entities.extend(climate_entities)
                 
+                # Scene groups
+                elif entity_id.startswith("scene."):
+                    # Use the helper method to extract entities from scene config
+                    scene_entities = self._extract_entities_from_scene_config(
+                        group_state.attributes.get("configuration", {})
+                    )
+                    member_entities.extend(scene_entities)
+                    
+                    # Also check for entities stored directly in attributes
+                    entities_in_scene = group_state.attributes.get("entities", {})
+                    if entities_in_scene:
+                        member_entities.extend([
+                            eid for eid in entities_in_scene.keys() 
+                            if self._is_valid_entity_id(eid)
+                        ])
+                
                 # Remove duplicates
                 member_entities = list(set(member_entities))
                 
@@ -1181,6 +1217,17 @@ class GraphService:
             
             return related
         
+        # Handle scene node relationships - show all entities controlled by the scene
+        if entity_id.startswith("scene."):
+            
+            scene_state = self.hass.states.get(entity_id)
+            if scene_state:
+                # Find all entities controlled by this scene
+                scene_related = await self._find_scene_referenced_entities(entity_id)
+                related.extend(scene_related)
+            
+            return related
+        
         # Automation-based relationships (do this for ALL entities, including automations)
         automation_related = await self._find_automation_relationships(entity_id)
         related.extend(automation_related)
@@ -1192,6 +1239,10 @@ class GraphService:
         # Alert-based relationships (do this for ALL entities, including alerts)
         alert_related = await self._find_alert_relationships(entity_id)
         related.extend(alert_related)
+        
+        # Scene-based relationships (do this for ALL entities, including scenes)
+        scene_related = await self._find_scene_relationships(entity_id)
+        related.extend(scene_related)
         
         # Helper/Proxy relationships (change type, input helpers, etc.)
         helper_related = await self._find_helper_relationships(entity_id)
@@ -1408,6 +1459,72 @@ class GraphService:
             related.append((alert_entity_id, "alert_depends"))
         
         _LOGGER.debug(f"Total entities found for {alert_name}: {len(related)}")
+        return related
+
+    async def _find_scene_relationships(self, entity_id: str) -> List[tuple[str, str]]:
+        """Find scene relationships - scenes control entities."""
+        related = []
+        
+        # Check all scenes to see if they control our entity
+        scene_entities = [
+            eid for eid in self.hass.states.async_entity_ids() 
+            if eid.startswith("scene.")
+        ]
+        
+        for scene_id in scene_entities:
+            scene_state = self.hass.states.get(scene_id)
+            if not scene_state:
+                continue
+                
+            # Scene entities are stored in the attributes, often under configuration
+            scene_config = scene_state.attributes.get("configuration", {})
+            
+            # Check if the scene configuration contains our entity
+            if self._entity_referenced_in_scene_config(entity_id, scene_config):
+                scene_name = scene_state.attributes.get("friendly_name", scene_id)
+                related.append((scene_id, "scene_controls"))
+                _LOGGER.debug(f"Found scene control relationship: {scene_name} controls {entity_id}")
+            
+            # Also check for scenes that might store entities directly in attributes
+            # Some scenes store entity states directly as attributes
+            entities_in_scene = scene_state.attributes.get("entities", {})
+            if entity_id in entities_in_scene:
+                scene_name = scene_state.attributes.get("friendly_name", scene_id)
+                related.append((scene_id, "scene_controls"))
+                _LOGGER.debug(f"Found scene entity relationship: {scene_name} controls {entity_id}")
+        
+        return related
+
+    async def _find_scene_referenced_entities(self, scene_id: str) -> List[tuple[str, str]]:
+        """Find all entities referenced by a scene."""
+        related = []
+        _LOGGER.debug(f"Finding entities referenced by scene: {scene_id}")
+        
+        state = self.hass.states.get(scene_id)
+        if not state:
+            _LOGGER.debug(f"No state found for scene: {scene_id}")
+            return related
+            
+        scene_config = state.attributes.get("configuration", {})
+        scene_name = state.attributes.get("friendly_name", scene_id)
+        _LOGGER.debug(f"Scene name: {scene_name}")
+        _LOGGER.debug(f"Scene config keys: {list(scene_config.keys()) if scene_config else 'No config'}")
+        
+        # Extract entities from scene configuration
+        entities_controlled = self._extract_entities_from_scene_config(scene_config)
+        for entity_id in entities_controlled:
+            _LOGGER.debug(f"Found scene control: {scene_name} -> {entity_id}")
+            related.append((entity_id, "scene_controls"))
+        
+        # Also check for entities stored directly in attributes
+        entities_in_scene = state.attributes.get("entities", {})
+        if entities_in_scene:
+            for entity_id in entities_in_scene:
+                if self._is_valid_entity_id(entity_id):
+                    _LOGGER.debug(f"Found scene entity: {scene_name} -> {entity_id}")
+                    related.append((entity_id, "scene_controls"))
+        
+        _LOGGER.debug(f"Total entities found for {scene_name}: {len(related)}")
         return related
 
     async def _find_device_relationships(self, entity_entry) -> List[tuple[str, str]]:
@@ -2072,6 +2189,46 @@ class GraphService:
                 entities.add(entity_entry.entity_id)
         return entities
 
+    def _entity_referenced_in_scene_config(self, entity_id: str, scene_config: Dict[str, Any]) -> bool:
+        """Check if an entity is referenced in scene configuration."""
+        if not scene_config:
+            return False
+        
+        # Check for entity in entities dict
+        entities = scene_config.get("entities", {})
+        if entity_id in entities:
+            return True
+        
+        # Check for entity in snapshot data (some scenes store it this way)
+        snapshot = scene_config.get("snapshot", {})
+        if entity_id in snapshot:
+            return True
+            
+        return False
+
+    def _extract_entities_from_scene_config(self, scene_config: Dict[str, Any]) -> Set[str]:
+        """Extract all entity IDs from scene configuration."""
+        entities = set()
+        
+        if not scene_config:
+            return entities
+        
+        # Check entities dict
+        scene_entities = scene_config.get("entities", {})
+        if isinstance(scene_entities, dict):
+            for entity_id in scene_entities.keys():
+                if self._is_valid_entity_id(entity_id):
+                    entities.add(entity_id)
+        
+        # Check snapshot data
+        snapshot = scene_config.get("snapshot", {})
+        if isinstance(snapshot, dict):
+            for entity_id in snapshot.keys():
+                if self._is_valid_entity_id(entity_id):
+                    entities.add(entity_id)
+        
+        return entities
+
     def _resolve_entity_uuid(self, uuid_or_entity_id: str) -> str | None:
         """Resolve entity UUID to actual entity ID, or return None if it's not a UUID."""
         # Entity UUIDs are typically 32-character hex strings without dots
@@ -2265,7 +2422,7 @@ class GraphService:
         """Find group relationships for this entity."""
         related = []
         
-        group_domains = ["group", "light", "switch", "cover", "fan", "media_player", "climate"]
+        group_domains = ["group", "light", "switch", "cover", "fan", "media_player", "climate", "scene"]
         entity_domain = entity_id.split('.')[0]
         
         # Part 1: If this IS a group entity, find what entities it contains
@@ -2481,6 +2638,22 @@ class GraphService:
             elif group_candidate_id.startswith("climate."):
                 climate_entities = group_state.attributes.get("entity_id", [])
                 member_entities.extend(climate_entities)
+                
+            # Scene groups (reverse lookup)
+            elif group_candidate_id.startswith("scene."):
+                # Use the helper method to extract entities from scene config
+                scene_entities = self._extract_entities_from_scene_config(
+                    group_state.attributes.get("configuration", {})
+                )
+                member_entities.extend(scene_entities)
+                
+                # Also check for entities stored directly in attributes
+                entities_in_scene = group_state.attributes.get("entities", {})
+                if entities_in_scene:
+                    member_entities.extend([
+                        eid for eid in entities_in_scene.keys() 
+                        if self._is_valid_entity_id(eid)
+                    ])
             
             # Remove duplicates and check if our entity is in the group
             member_entities = list(set(member_entities))

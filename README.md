@@ -188,17 +188,19 @@ Please use the [GitHub Issues](https://github.com/jonducrou/ha_visualiser/issues
 
 ## 📊 Project Status
 
-This project is actively maintained and production-ready. Current version: **0.8.2**
+This project is actively maintained and production-ready. Current version: **0.8.3**
 
 ### Recent Updates
+- 🎯 **HACS Compliance & Scene Support (v0.8.3)**: Fixed HACS path conflicts and added comprehensive scene relationship detection
 - 🐛 **Bug Fixes (v0.8.2)**: Fixed device trigger automation relationships and enhanced group helper detection
 - ✅ Comprehensive group support (light groups, switch groups, media player groups)
 - ✅ Advanced template parsing for complex Jinja2 templates  
 - ✅ Helper entity relationship detection (change-type helpers)
-- ✅ Cleaned up debug logging for better performance
 - ✅ Enhanced bidirectional relationship navigation
 
-### Latest Bug Fixes (v0.8.2)
+### Latest Updates (v0.8.3)
+- **HACS Path Compliance**: Fixed HACS rejection by changing static paths from `/hacsfiles/` to `/api/ha_visualiser/static/` 
+- **Scene Relationships (#3)**: Complete scene relationship implementation showing all entities controlled by scenes with proper configuration parsing
 - **Device Triggers (#1)**: Device triggers in automations now properly show device relationships instead of cluttering with all device entities
 - **Group Helper Contents (#2)**: Enhanced group helper detection with comprehensive attribute checking and debug logging for UI-created groups
 

@@ -38,7 +38,7 @@ echo "  ls -la /path/to/homeassistant/config/custom_components/ha_visualiser/www
 echo "  grep 'v0.4' /path/to/homeassistant/config/custom_components/ha_visualiser/www/ha-visualiser-panel.js"
 echo
 echo "Restart HA and check URL directly in browser:"
-echo "  http://your-ha-url:8123/hacsfiles/ha_visualiser/ha-visualiser-panel.js"
+echo "  http://your-ha-url:8123/api/ha_visualiser/static/ha-visualiser-panel.js"
 echo
 echo "In browser console, check for version:"
 echo "  Look for: 'HA Visualiser Panel v0.4.x: [latest feature description]'"
