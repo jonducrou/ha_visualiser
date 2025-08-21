@@ -60,3 +60,4 @@ No specific build commands yet - this is a pure HA custom integration.
 "async_register_built_in_panel" is deprecated, do not use.
 - bump the version number after changes
 - process a single github bug one at a time, ensuring it's working before moving to the next. prompt to respond to the bug and close it
+- when bumping versions, remember to include the ha-visualiser-panel.js version string
