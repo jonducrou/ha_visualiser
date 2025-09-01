@@ -24,8 +24,8 @@ A powerful Home Assistant custom integration that visualizes your smart home as 
 - **Entity Icons**: Visual icons for each domain (💡 lights, 🔌 switches, 🤖 automations, etc.)  
 - **Focus Highlighting**: Enhanced visual feedback for the currently selected entity
 - **Dual Layout Modes**: Hierarchical for simple graphs, force-directed for complex networks
-- **Layout Debug Panel**: Real-time layout parameter tuning with live preview
-- **Double-Click Navigation**: Smooth, intuitive entity exploration
+- **Native HA Integration**: Single-click opens Home Assistant entity details dialogs
+- **Double-Click Navigation**: Smooth, intuitive entity exploration through relationship networks
 
 ### 🔍 **Comprehensive Relationship Detection**
 - **Device Relationships**: Physical device to entity mappings
@@ -80,20 +80,23 @@ A powerful Home Assistant custom integration that visualizes your smart home as 
 2. Add this repository to HACS as a custom repository
 3. Download "Home Assistant Entity Visualizer"
 4. Restart Home Assistant
-5. The visualizer will appear in your sidebar
+5. ✅ **"Entity Visualizer" appears automatically in your sidebar**
 
 ### **Manual Installation**
 1. Copy the `custom_components/ha_visualiser/` directory to your HA `custom_components/` folder
-2. Restart Home Assistant
-3. The integration will be automatically loaded
+2. Restart Home Assistant  
+3. ✅ **"Entity Visualizer" appears automatically in your sidebar**
+
+> **Note**: As of v0.8.8, the integration sets up automatically after file installation. No manual configuration through Settings > Integrations is required!
 
 ## 📖 Usage
 
 ### **Basic Navigation**
 1. **Open the Panel**: Click "Entity Visualizer" in your HA sidebar
 2. **Search**: Type in the search box to find entities, devices, areas, zones, or labels
-3. **Explore**: Click on any entity to see its neighborhood relationships
-4. **Navigate**: Click on connected nodes to explore different areas of your smart home
+3. **Entity Details**: Single-click any entity to open its native Home Assistant details dialog
+4. **Navigate**: Double-click any node to explore its neighborhood relationships
+5. **Explore**: Continue navigating through different areas of your smart home
 
 ### **Understanding the Visualization**
 - **Nodes**: Represent entities, devices, areas, zones, labels, and automations
@@ -188,21 +191,27 @@ Please use the [GitHub Issues](https://github.com/jonducrou/ha_visualiser/issues
 
 ## 📊 Project Status
 
-This project is actively maintained and production-ready. Current version: **0.8.3**
+This project is actively maintained and production-ready. Current version: **0.8.8**
 
-### Recent Updates
-- 🎯 **HACS Compliance & Scene Support (v0.8.3)**: Fixed HACS path conflicts and added comprehensive scene relationship detection
-- 🐛 **Bug Fixes (v0.8.2)**: Fixed device trigger automation relationships and enhanced group helper detection
-- ✅ Comprehensive group support (light groups, switch groups, media player groups)
-- ✅ Advanced template parsing for complex Jinja2 templates  
-- ✅ Helper entity relationship detection (change-type helpers)
-- ✅ Enhanced bidirectional relationship navigation
+### Major Recent Updates
 
-### Latest Updates (v0.8.3)
-- **HACS Path Compliance**: Fixed HACS rejection by changing static paths from `/hacsfiles/` to `/api/ha_visualiser/static/` 
-- **Scene Relationships (#3)**: Complete scene relationship implementation showing all entities controlled by scenes with proper configuration parsing
-- **Device Triggers (#1)**: Device triggers in automations now properly show device relationships instead of cluttering with all device entities
-- **Group Helper Contents (#2)**: Enhanced group helper detection with comprehensive attribute checking and debug logging for UI-created groups
+#### **v0.8.8 - Critical Architecture Fixes** 🔧
+- **✅ Bidirectional Relationships Fixed**: Automation relationships now work properly from devices, areas, zones, labels, and scenes
+- **✅ Automatic Installation**: Sidebar appears automatically after file installation - no manual setup required
+- **🏗️ Architecture**: Fixed early return bugs that prevented universal relationship detection
+
+#### **v0.8.4-0.8.7 - User Experience & Bug Fixes** 🎯
+- **🖱️ Native HA Entity Dialogs (v0.8.4)**: Single-click entities to open Home Assistant details dialogs
+- **🐛 Double-Click Navigation (v0.8.6)**: Fixed regression where double-click navigation stopped working  
+- **🏠 Enhanced Scene Support (v0.8.5)**: Comprehensive scene entity relationship detection
+- **🔗 Zone Self-Reference Fix (v0.8.7)**: Zones no longer show confusing relationships to themselves
+
+#### **Earlier Releases**
+- **✅ HACS Compliance & Scene Support (v0.8.3)**: Fixed HACS path conflicts and scene relationships
+- **✅ Comprehensive Group Support**: Light groups, switch groups, media player groups
+- **✅ Advanced Template Parsing**: Complex multi-line Jinja2 template support  
+- **✅ Helper Entity Detection**: Change-type helpers and proxy relationships
+- **✅ Enhanced Navigation**: Bidirectional relationship discovery
 
 ### Roadmap
 - 🔄 Performance optimization for very large installations (>1000 entities)
