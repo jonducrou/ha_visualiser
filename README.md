@@ -107,8 +107,7 @@ A powerful Home Assistant custom integration that visualizes your smart home as 
 
 ### **Advanced Features**
 - **2-Level Exploration**: See not just direct relationships but extended networks
-- **Layout Debugging**: Real-time layout parameter adjustment with JSON editor and live preview
-- **Area Filtering**: "Show Areas" checkbox to toggle area relationships on/off
+- **Area Filtering**: "Show Areas" checkbox to toggle area relationships on/off ([detailed documentation](FILTERS.md))
 - **Layout Toggle**: Switch between hierarchical and force-directed layouts for optimal visualization
 - **Symmetrical Navigation**: Relationships work bidirectionally for complete context
 - **Group Support**: Comprehensive support for all Home Assistant group types

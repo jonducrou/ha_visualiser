@@ -83,11 +83,6 @@ When areas are hidden, these relationship types are excluded:
 
 ### Interaction with Other Features
 
-#### Debug Panel
-- Area filtering works seamlessly with layout debugging
-- Fewer nodes when areas are hidden may require different layout parameters
-- Use compact layouts for simplified graphs
-
 #### Depth Control
 - Area filtering applies at all depth levels
 - Depth traversal continues through non-area relationships
