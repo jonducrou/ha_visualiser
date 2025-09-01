@@ -31,9 +31,36 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Home Assistant Entity Visualizer integration."""
     _LOGGER.info("Setting up Home Assistant Entity Visualizer integration")
     
-    # Always set up the integration regardless of YAML config
-    # This allows the sidebar to appear automatically after file installation
+    # Check if already initialized to prevent conflicts
+    if DOMAIN in hass.data:
+        _LOGGER.debug("Integration already initialized, skipping setup")
+        return True
+    
+    # For config_flow: false integrations, always initialize when files are present
+    # This provides automatic setup without requiring manual configuration
+    if DOMAIN not in config:
+        _LOGGER.debug("No YAML configuration found, initializing automatically for sidebar setup")
+        # Create minimal config to proceed with initialization
+        config = {DOMAIN: {}}
+    
+    try:
+        return await _setup_integration(hass, config)
+    except Exception as e:
+        _LOGGER.error("Failed to setup integration: %s", e, exc_info=True)
+        # Clean up on failure to prevent partial initialization
+        if DOMAIN in hass.data:
+            hass.data.pop(DOMAIN)
+        return False
+
+
+async def _setup_integration(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Shared setup logic for both YAML and config entry setup."""
     hass.data.setdefault(DOMAIN, {})
+    
+    # Check if already set up to avoid duplicates
+    if "graph_service" in hass.data[DOMAIN]:
+        _LOGGER.debug("Integration services already initialized, skipping duplicate setup")
+        return True
     
     # Initialize the graph service
     graph_service = GraphService(hass)
@@ -42,14 +69,19 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     # Register websocket API handlers
     async_register_websocket_handlers(hass)
     
-    # Register the frontend panel
-    await hass.http.async_register_static_paths([
-        StaticPathConfig(
-            "/api/ha_visualiser/static",
-            hass.config.path("custom_components/ha_visualiser/www"),
-            False
-        )
-    ])
+    # Register the frontend panel with better error handling
+    try:
+        await hass.http.async_register_static_paths([
+            StaticPathConfig(
+                "/api/ha_visualiser/static",
+                hass.config.path("custom_components/ha_visualiser/www"),
+                False
+            )
+        ])
+        _LOGGER.debug("Static paths registered successfully")
+    except Exception as e:
+        _LOGGER.error("Failed to register static paths: %s", e)
+        raise
     
     # Register the panel with defensive error handling
     try:
@@ -70,57 +102,34 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         else:
             _LOGGER.error("Failed to register panel: %s", e)
             raise
+    except Exception as e:
+        _LOGGER.error("Unexpected error during panel registration: %s", e)
+        raise
     
-    _LOGGER.info("Home Assistant Entity Visualizer integration loaded successfully")
-    _LOGGER.debug("Integration setup completed - panel and websocket handlers registered")
+    _LOGGER.info("Home Assistant Entity Visualizer integration setup completed")
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Home Assistant Entity Visualizer from a config entry."""
-    hass.data.setdefault(DOMAIN, {})
+    _LOGGER.info("Setting up Entity Visualizer from config entry")
     
-    # Check if already set up to avoid duplicates
-    if "graph_service" not in hass.data[DOMAIN]:
-        # Initialize the graph service
-        graph_service = GraphService(hass)
-        hass.data[DOMAIN]["graph_service"] = graph_service
-        
-        # Register websocket API handlers
-        async_register_websocket_handlers(hass)
-        
-        # Register the frontend panel
-        await hass.http.async_register_static_paths([
-            StaticPathConfig(
-                "/api/ha_visualiser/static",
-                hass.config.path("custom_components/ha_visualiser/www"),
-                False
-            )
-        ])
-        
-        # Register the panel with defensive error handling
-        try:
-            await panel_custom.async_register_panel(
-                hass,
-                frontend_url_path="ha_visualiser",
-                webcomponent_name="ha-visualiser-panel",
-                sidebar_title="Entity Visualizer",
-                sidebar_icon="mdi:graph",
-                module_url="/api/ha_visualiser/static/ha-visualiser-panel.js",
-                config={},
-                require_admin=False,
-            )
-            _LOGGER.debug("Panel registered successfully")
-        except ValueError as e:
-            if "Overwriting panel" in str(e):
-                _LOGGER.debug("Panel already registered, skipping registration")
-            else:
-                _LOGGER.error("Failed to register panel: %s", e)
-                raise
+    # Check if already initialized via YAML setup to prevent conflicts
+    if DOMAIN in hass.data and "graph_service" in hass.data[DOMAIN]:
+        _LOGGER.debug("Integration already initialized via YAML, skipping config entry setup")
+        return True
     
-    _LOGGER.info("Home Assistant Entity Visualizer integration loaded via config entry")
-    _LOGGER.debug("Config entry setup completed - services available")
-    return True
+    try:
+        result = await _setup_integration(hass, {})
+        if result:
+            _LOGGER.info("Entity Visualizer loaded successfully via config entry")
+        return result
+    except Exception as e:
+        _LOGGER.error("Failed to setup integration from config entry: %s", e, exc_info=True)
+        # Clean up on failure
+        if DOMAIN in hass.data:
+            hass.data.pop(DOMAIN)
+        return False
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

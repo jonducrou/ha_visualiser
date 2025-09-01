@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.8.8: Fixed bidirectional relationships for all node types and automatic sidebar setup');
+    console.log('HA Visualiser Panel v0.8.9: Hotfix for boot failures - safer auto-initialization');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
