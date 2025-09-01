@@ -994,6 +994,11 @@ class GraphService:
                         label_node_id = f"label:{label_id}"
                         related.append((label_node_id, "labelled"))
             
+            # IMPORTANT: Also check for automation relationships for device nodes
+            # This was missing and caused the bidirectional relationship bug
+            automation_related = await self._find_automation_relationships(entity_id)
+            related.extend(automation_related)
+            
             return related
         
         # Handle area node relationships - show all entities in the area
@@ -1037,6 +1042,10 @@ class GraphService:
                         label_node_id = f"label:{label_id}"
                         related.append((label_node_id, "labelled"))
             
+            # Also check for automation relationships for area nodes
+            automation_related = await self._find_automation_relationships(entity_id)
+            related.extend(automation_related)
+            
             return related
         
         # Handle zone node relationships - show all entities in the zone
@@ -1071,6 +1080,10 @@ class GraphService:
                     if distance <= zone_radius:
                         # Zone contains entity: return entity with zone_contains relationship
                         related.append((test_entity_id, "zone_contains"))
+            
+            # Also check for automation relationships for zone nodes
+            automation_related = await self._find_automation_relationships(entity_id)
+            related.extend(automation_related)
             
             return related
         
@@ -1219,6 +1232,10 @@ class GraphService:
                     # Label labels area: return area with labelled relationship
                     related.append((area_node_id, "labelled"))
             
+            # Also check for automation relationships for label nodes
+            automation_related = await self._find_automation_relationships(entity_id)
+            related.extend(automation_related)
+            
             return related
         
         # Handle scene node relationships - show all entities controlled by the scene
@@ -1229,6 +1246,10 @@ class GraphService:
                 # Find all entities controlled by this scene
                 scene_related = await self._find_scene_referenced_entities(entity_id)
                 related.extend(scene_related)
+            
+            # Also check for automation relationships for scene nodes
+            automation_related = await self._find_automation_relationships(entity_id)
+            related.extend(automation_related)
             
             return related
         

@@ -31,10 +31,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Home Assistant Entity Visualizer integration."""
     _LOGGER.info("Setting up Home Assistant Entity Visualizer integration")
     
-    if DOMAIN not in config:
-        _LOGGER.debug("No configuration found for %s", DOMAIN)
-        return True
-    
+    # Always set up the integration regardless of YAML config
+    # This allows the sidebar to appear automatically after file installation
     hass.data.setdefault(DOMAIN, {})
     
     # Initialize the graph service
