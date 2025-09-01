@@ -124,13 +124,38 @@ The existing `tests/test_runner.py` and `tests/test_graph_service.py` assume a f
 4. **Version Management**: Always bump version after significant changes
 5. **HACS Process**: Manual review and submission works better than auto-submission
 
-## Current Status (v0.8.2)
+## Major Architectural Lessons (v0.8.7-0.8.8)
+
+### Early Return Bug Pattern ❌
+- **Issue**: Special node types (device, area, zone, label, scene) returned early, never reaching automation relationship checking
+- **Impact**: Caused bidirectional relationship bugs (issue #5)
+- **Root Cause**: Each special node handler had its own early return without calling shared relationship methods
+- **Lesson**: When adding new node types, ensure they don't skip universal relationship checks
+
+### Config Flow vs Auto-Setup ❌→✅
+- **Original Approach**: Required manual integration setup via Settings > Integrations
+- **Problem**: Users expected automatic setup after file installation (issues #8, #9)
+- **Solution**: Removed `config_flow: true`, made `async_setup()` always initialize
+- **Lesson**: For simple integrations, auto-setup provides better user experience than config flows
+
+### Relationship Detection Architecture ✅
+- **What Works**: Having universal relationship methods that can be called from anywhere
+- **What Doesn't Work**: Node-specific handlers that bypass universal checks
+- **Pattern**: All node types should call automation/script/scene relationship methods before returning
+
+### Bug Investigation Methodology ✅
+1. **Read GitHub Issue Carefully**: Issue #5 was reopened - our fix didn't actually work
+2. **Trace Code Flow**: Found that device nodes returned early, never reaching automation code
+3. **Fix Root Cause**: Add relationship checks to ALL special node handlers, not just regular entities
+4. **Verify Fix**: Ensure the architectural problem is solved, not just the symptom
+
+## Current Status (v0.8.8)
 
 - ✅ **Testing**: Syntax validation reliable, manual HA testing preferred
-- ✅ **Bug Fixes**: GitHub issues #1 and #2 resolved with targeted fixes  
-- ✅ **HACS Ready**: Repository structured properly, PR template prepared
-- ✅ **Documentation**: Comprehensive README and technical documentation
-- ⏸️ **HACS Submission**: Prepared but not auto-submitted, awaiting manual review
+- ✅ **Bug Fixes**: All major architectural issues resolved (bidirectional relationships, auto-setup)
+- ✅ **User Experience**: Installation now automatic, no manual config flow required
+- ✅ **GitHub Issues**: All open issues (#5, #8, #9) resolved and closed
+- ✅ **Architecture**: Universal relationship checking ensures consistent behavior across node types
 
 ## Future Considerations
 
