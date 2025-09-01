@@ -124,6 +124,39 @@ The existing `tests/test_runner.py` and `tests/test_graph_service.py` assume a f
 4. **Version Management**: Always bump version after significant changes
 5. **HACS Process**: Manual review and submission works better than auto-submission
 
+## Critical Boot Failure Lessons (v0.8.8-0.8.9)
+
+### Home Assistant Integration Safety ❌→✅
+- **Issue**: v0.8.8 aggressive auto-initialization caused HA boot failures for users
+- **Impact**: **CRITICAL** - Users' Home Assistant installations failed to start
+- **Root Cause**: Removed safety checks without considering initialization conflicts and error cases
+- **Lesson**: **NEVER break users' HA installations** - integration failures must be non-fatal to HA startup
+
+### Initialization Safety Patterns ❌→✅
+- **Problem**: Forced initialization without duplicate detection or error handling
+- **Consequence**: Conflicts between YAML and config entry setup paths, partial initialization states
+- **Solution**: Always check for existing initialization, comprehensive error handling with cleanup
+- **Pattern**: `if DOMAIN in hass.data: return True` prevents conflicts
+
+### Critical Hotfix Process ✅
+1. **Immediate User Support**: Provide recovery instructions (CLI removal) before fixing
+2. **Root Cause Analysis**: Identify exact failure points in initialization logic
+3. **Conservative Fix**: Restore safety while preserving intended functionality
+4. **Comprehensive Testing**: Syntax validation and logical flow analysis
+5. **Emergency Release**: Same-day hotfix with clear communication
+
+### Error Handling Best Practices ✅
+```python
+try:
+    return await _setup_integration(hass, config)
+except Exception as e:
+    _LOGGER.error("Failed to setup integration: %s", e, exc_info=True)
+    # CRITICAL: Clean up on failure to prevent partial initialization
+    if DOMAIN in hass.data:
+        hass.data.pop(DOMAIN)
+    return False
+```
+
 ## Major Architectural Lessons (v0.8.7-0.8.8)
 
 ### Early Return Bug Pattern ❌
@@ -149,13 +182,14 @@ The existing `tests/test_runner.py` and `tests/test_graph_service.py` assume a f
 3. **Fix Root Cause**: Add relationship checks to ALL special node handlers, not just regular entities
 4. **Verify Fix**: Ensure the architectural problem is solved, not just the symptom
 
-## Current Status (v0.8.8)
+## Current Status (v0.8.9)
 
 - ✅ **Testing**: Syntax validation reliable, manual HA testing preferred
 - ✅ **Bug Fixes**: All major architectural issues resolved (bidirectional relationships, auto-setup)
-- ✅ **User Experience**: Installation now automatic, no manual config flow required
-- ✅ **GitHub Issues**: All open issues (#5, #8, #9) resolved and closed
-- ✅ **Architecture**: Universal relationship checking ensures consistent behavior across node types
+- ✅ **Critical Safety**: Boot failure issues resolved with comprehensive error handling
+- ✅ **User Experience**: Installation automatic with safe initialization patterns
+- ✅ **GitHub Issues**: All open issues (#5, #8, #9) resolved and closed  
+- ✅ **Architecture**: Universal relationship checking + safe initialization patterns
 
 ## Future Considerations
 

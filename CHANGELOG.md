@@ -2,6 +2,20 @@
 
 All notable changes to the Home Assistant Entity Visualizer will be documented in this file.
 
+## [0.8.9] - 2025-09-01
+
+### Fixed
+- **CRITICAL: Home Assistant Boot Failures**: Fixed critical issue where v0.8.8 prevented HA from starting
+- **Safer Auto-Initialization**: Restored safety checks while preserving automatic sidebar setup
+- **Duplicate Initialization Prevention**: Added checks to prevent conflicts between setup methods
+- **Comprehensive Error Handling**: Proper cleanup on initialization failures
+
+### Technical
+- Restored early return checks in `async_setup()` for safer initialization
+- Implemented shared `_setup_integration()` logic to prevent YAML/config entry conflicts  
+- Added comprehensive error handling and cleanup on failures
+- Preserved automatic sidebar functionality with safer implementation
+
 ## [0.8.8] - 2025-09-01
 
 ### Fixed

@@ -190,9 +190,14 @@ Please use the [GitHub Issues](https://github.com/jonducrou/ha_visualiser/issues
 
 ## 📊 Project Status
 
-This project is actively maintained and production-ready. Current version: **0.8.8**
+This project is actively maintained and production-ready. Current version: **0.8.9**
 
 ### Major Recent Updates
+
+#### **v0.8.9 - Critical Hotfix** 🚨
+- **🔧 Boot Failure Fix**: Fixed critical issue where v0.8.8 prevented Home Assistant from starting
+- **🛡️ Safe Auto-Setup**: Restored initialization safety checks while preserving automatic sidebar functionality
+- **⚡ Same-Day Fix**: Immediate hotfix release with comprehensive error handling and cleanup
 
 #### **v0.8.8 - Critical Architecture Fixes** 🔧
 - **✅ Bidirectional Relationships Fixed**: Automation relationships now work properly from devices, areas, zones, labels, and scenes
