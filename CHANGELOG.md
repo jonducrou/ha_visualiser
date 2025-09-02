@@ -2,6 +2,24 @@
 
 All notable changes to the Home Assistant Entity Visualizer will be documented in this file.
 
+## [0.8.11] - 2025-09-02
+
+### Added
+- **🔄 Persistent User Preferences**: Show Areas, Depth, and Layout settings now remembered between sessions
+- **💾 Client-Side Storage**: All preferences stored locally using browser localStorage - completely private
+- **⚡ Instant Preference Saving**: Settings automatically saved as soon as user changes them
+
+### Enhanced
+- **🎯 Smart Defaults**: Preferences gracefully fall back to sensible defaults when localStorage unavailable
+- **🛡️ Error Resilience**: Comprehensive error handling for localStorage edge cases and corrupted data
+- **📱 Cross-Session Experience**: Your preferred settings persist across browser restarts and HA reboots
+
+### Technical
+- Added `loadUserPreferences()`, `saveUserPreferences()`, and `applyUserPreferences()` methods
+- Implemented localStorage-based preference management with validation and sanitization
+- Enhanced all option event handlers to save preferences immediately on change
+- Removed hardcoded HTML defaults in favor of dynamic preference application
+
 ## [0.8.10] - 2025-09-02
 
 ### Fixed
