@@ -190,9 +190,14 @@ Please use the [GitHub Issues](https://github.com/jonducrou/ha_visualiser/issues
 
 ## 📊 Project Status
 
-This project is actively maintained and production-ready. Current version: **0.8.9**
+This project is actively maintained and production-ready. Current version: **0.8.10**
 
 ### Major Recent Updates
+
+#### **v0.8.10 - "No visualisations" Error Fix** 🐛
+- **🔧 Graph Loading Fix**: Fixed critical "'NoneType' object is not iterable" error preventing visualization
+- **🛡️ Defensive Programming**: Added comprehensive error handling throughout graph building pipeline
+- **🔄 Safe Fallbacks**: Graph service returns empty results instead of crashing on errors
 
 #### **v0.8.9 - Critical Hotfix** 🚨
 - **🔧 Boot Failure Fix**: Fixed critical issue where v0.8.8 prevented Home Assistant from starting

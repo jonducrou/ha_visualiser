@@ -182,14 +182,45 @@ except Exception as e:
 3. **Fix Root Cause**: Add relationship checks to ALL special node handlers, not just regular entities
 4. **Verify Fix**: Ensure the architectural problem is solved, not just the symptom
 
-## Current Status (v0.8.9)
+## Error Handling and Data Validation Lessons (v0.8.10)
+
+### Graph Service Data Integrity ❌→✅
+- **Issue**: "'NoneType' object is not iterable" errors when graph service returned None for nodes/edges (Issue #10)
+- **Root Cause**: Graph building methods could fail silently without proper error handling, returning corrupted data structures
+- **Lesson**: **Always validate data structures before returning from service methods** - never assume success
+
+### WebSocket API Defensive Programming ❌→✅
+- **Problem**: WebSocket handlers assumed graph service would always return valid list structures
+- **Consequence**: Frontend crashes when attempting to iterate over None values from backend failures
+- **Solution**: Add validation and safe fallbacks at API boundary between services and frontend
+- **Pattern**: `if nodes is None: nodes = []` prevents downstream crashes
+
+### Comprehensive Error Recovery ✅
+```python
+try:
+    # Complex graph building logic
+    return {"nodes": nodes_list, "edges": edges_list}
+except Exception as e:
+    _LOGGER.error(f"Error building graph: {e}", exc_info=True)
+    # Return safe empty result instead of corrupted data
+    return {"nodes": [], "edges": [], "center_node": entity_id}
+```
+
+### Data Structure Validation Best Practices ✅
+- Always validate data types before returning from service methods
+- Use isinstance() checks for type safety: `isinstance(nodes, dict)`
+- Provide safe fallbacks for all data structures
+- Log detailed error information to help identify root causes
+
+## Current Status (v0.8.10)
 
 - ✅ **Testing**: Syntax validation reliable, manual HA testing preferred
-- ✅ **Bug Fixes**: All major architectural issues resolved (bidirectional relationships, auto-setup)
-- ✅ **Critical Safety**: Boot failure issues resolved with comprehensive error handling
-- ✅ **User Experience**: Installation automatic with safe initialization patterns
-- ✅ **GitHub Issues**: All open issues (#5, #8, #9) resolved and closed  
-- ✅ **Architecture**: Universal relationship checking + safe initialization patterns
+- ✅ **Bug Fixes**: All major architectural issues resolved (bidirectional relationships, auto-setup, graph data corruption)
+- ✅ **Critical Safety**: Boot failure and data corruption issues resolved with comprehensive error handling
+- ✅ **User Experience**: Installation automatic with safe initialization patterns, no visualization crashes
+- ✅ **GitHub Issues**: All open issues (#5, #8, #9, #10) resolved and closed  
+- ✅ **Architecture**: Universal relationship checking + safe initialization + defensive data validation patterns
+- ✅ **Error Handling**: Comprehensive try-catch blocks and data validation throughout service layer
 
 ## Future Considerations
 
