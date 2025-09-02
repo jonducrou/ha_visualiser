@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.8.9: Hotfix for boot failures - safer auto-initialization');
+    console.log('HA Visualiser Panel v0.8.10: Fix "No visualisations" error - defensive error handling');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded

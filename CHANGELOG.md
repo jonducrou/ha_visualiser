@@ -2,6 +2,19 @@
 
 All notable changes to the Home Assistant Entity Visualizer will be documented in this file.
 
+## [0.8.10] - 2025-09-02
+
+### Fixed
+- **"No visualisations" Error**: Fixed critical error where graph visualization failed with "'NoneType' object is not iterable" (Issue #10)
+- **Defensive Programming**: Added comprehensive error handling and validation in both WebSocket API and graph service
+- **Safe Fallbacks**: Graph service now returns empty safe results on any error instead of corrupted data
+
+### Technical
+- Added try-catch blocks around all graph building methods in `graph_service.py`
+- Added validation for nodes and edges data structures in `websocket_api.py`
+- Enhanced error logging to help identify root causes of graph building failures
+- Improved data structure validation before JSON serialization
+
 ## [0.8.9] - 2025-09-01
 
 ### Fixed
