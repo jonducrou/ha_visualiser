@@ -2,6 +2,19 @@
 
 All notable changes to the Home Assistant Entity Visualizer will be documented in this file.
 
+## [0.8.12] - 2025-09-03
+
+### Attempted Fix
+- **📍 Panel Registration Robustness**: Attempted fix for side menu/panel not appearing after installation (Issue #11)
+- **🔄 Setup Logic Improvement**: Made panel registration more robust to handle edge cases during HA restarts
+- **⚠️ Experimental**: This is an attempted fix based on code analysis - unable to reproduce the issue locally
+
+### Technical
+- Added `_ensure_panel_registered()` function to retry panel registration in edge case scenarios
+- Modified setup logic to always verify panel registration even when services are already initialized
+- Enhanced error handling and logging around panel registration
+- **Note**: If issue persists, we need more detailed reproduction steps and log files
+
 ## [0.8.11] - 2025-09-02
 
 ### Added

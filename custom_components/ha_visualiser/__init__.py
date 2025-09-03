@@ -53,24 +53,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         return False
 
 
-async def _setup_integration(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Shared setup logic for both YAML and config entry setup."""
-    hass.data.setdefault(DOMAIN, {})
+async def _ensure_panel_registered(hass: HomeAssistant) -> bool:
+    """Ensure the panel is registered, used for retry scenarios."""
+    _LOGGER.debug("Ensuring panel registration")
     
-    # Check if already set up to avoid duplicates
-    if "graph_service" in hass.data[DOMAIN]:
-        _LOGGER.debug("Integration services already initialized, skipping duplicate setup")
-        return True
-    
-    # Initialize the graph service
-    graph_service = GraphService(hass)
-    hass.data[DOMAIN]["graph_service"] = graph_service
-    
-    # Register websocket API handlers
-    async_register_websocket_handlers(hass)
-    
-    # Register the frontend panel with better error handling
     try:
+        # Register static paths if not already registered
         await hass.http.async_register_static_paths([
             StaticPathConfig(
                 "/api/ha_visualiser/static",
@@ -80,8 +68,8 @@ async def _setup_integration(hass: HomeAssistant, config: ConfigType) -> bool:
         ])
         _LOGGER.debug("Static paths registered successfully")
     except Exception as e:
-        _LOGGER.error("Failed to register static paths: %s", e)
-        raise
+        # Static paths might already be registered, this is not critical
+        _LOGGER.debug("Static paths registration skipped or failed: %s", e)
     
     # Register the panel with defensive error handling
     try:
@@ -95,16 +83,43 @@ async def _setup_integration(hass: HomeAssistant, config: ConfigType) -> bool:
             config={},
             require_admin=False,
         )
-        _LOGGER.debug("Panel registered successfully")
+        _LOGGER.info("Panel registered successfully")
+        return True
     except ValueError as e:
         if "Overwriting panel" in str(e):
             _LOGGER.debug("Panel already registered, skipping registration")
+            return True
         else:
             _LOGGER.error("Failed to register panel: %s", e)
-            raise
+            return False
     except Exception as e:
         _LOGGER.error("Unexpected error during panel registration: %s", e)
-        raise
+        return False
+
+
+async def _setup_integration(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Shared setup logic for both YAML and config entry setup."""
+    hass.data.setdefault(DOMAIN, {})
+    
+    # Check if already set up to avoid duplicates
+    if "graph_service" in hass.data[DOMAIN]:
+        _LOGGER.debug("Integration services already initialized, checking panel registration")
+        # Even if services are initialized, we need to ensure panel is registered
+        # This handles cases where panel registration failed on previous attempts
+        return await _ensure_panel_registered(hass)
+    
+    # Initialize the graph service
+    graph_service = GraphService(hass)
+    hass.data[DOMAIN]["graph_service"] = graph_service
+    
+    # Register websocket API handlers
+    async_register_websocket_handlers(hass)
+    
+    # Register the frontend panel
+    panel_result = await _ensure_panel_registered(hass)
+    if not panel_result:
+        _LOGGER.error("Failed to register panel during initial setup")
+        return False
     
     _LOGGER.info("Home Assistant Entity Visualizer integration setup completed")
     return True

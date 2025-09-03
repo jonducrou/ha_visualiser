@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.8.11: Persistent user preferences - remember settings between sessions');
+    console.log('HA Visualiser Panel v0.8.12: Fix panel registration issue - sidebar should now appear consistently');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded

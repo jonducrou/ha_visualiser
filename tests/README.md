@@ -31,7 +31,22 @@ Historical test scripts that document issues that have been fixed:
 
 ## Running Tests
 
-### 🚀 NEW Comprehensive Test Suite
+### 🚀 NEW Enhanced Test Suite with Mock-Based Unit Testing
+```bash
+cd /path/to/ha_visualiser
+python3 tests/run_pytest_suite.py
+```
+
+**Features:**
+- ✅ **Mock-Based Unit Testing**: Real unit tests using pytest with mocked HA dependencies
+- ✅ **Preference Management Testing**: Complete coverage of localStorage-based user preferences
+- ✅ **Graph Service Logic Testing**: Core relationship detection and data validation
+- ✅ **WebSocket API Testing**: Command validation, error handling, and response formatting  
+- ✅ **Comprehensive Validation**: Syntax checking, linting, and file integrity tests
+- ✅ **Automatic Dependency Management**: Installs pytest dependencies if missing
+- ✅ **Detailed Reporting**: Test results, success rates, and actionable next steps
+
+### Legacy Comprehensive Test Suite
 ```bash
 cd /path/to/ha_visualiser
 python3 tests/run_tests.py
@@ -63,38 +78,41 @@ bash tests/test_file_serving.sh
 
 ## Test Results & Interpretation
 
-### ✅ Expected Pass Results (19/21)
-When running `python3 tests/run_tests.py`, you should see:
+### ✅ Enhanced Test Results (50/50)
+When running `python3 tests/run_pytest_suite.py`, you should see:
 
-**Code Structure (12/12 passed):**
-- All integration files exist and are accessible
-- Version correctly updated to 0.6.0 in manifest.json
-- Default depth parameter set to 3 in backend
-- Conditional relationship direction fixed (entity → automation)
-- Frontend depth control properly implemented
-- Reset button functionality corrected
-- Canvas expansion and UI improvements verified
+**Code Validation Tests (3/3 passed):**
+- ✅ **Syntax Validation**: All Python files have valid syntax
+- ✅ **Code Linting**: Clean code with minimal warnings (non-blocking)
+- ✅ **File Serving**: File structure and deployment validation
 
-**Configuration & Syntax (7/7 passed):**
-- All Python files have valid syntax
-- Manifest.json has required fields and correct domain
-- HACS configuration is valid JSON
+**Mock-Based Unit Tests (47/47 passed):**
+- ✅ **Preference Management (14 tests)**: Complete localStorage functionality coverage
+  - Default value handling and validation
+  - Data parsing (boolean, integer, string) with edge cases  
+  - Cross-session persistence simulation
+  - Error handling and fallback scenarios
+- ✅ **Graph Service Logic (23 tests)**: Core business logic validation
+  - Data structure validation (nodes, edges, results)
+  - Entity ID patterns and special prefixes (device:, area:, zone., label:)
+  - Parameter validation (depth, filters, show_areas)
+  - Relationship type categorization
+  - JSON serialization compatibility
+- ✅ **WebSocket API Handlers (10 tests)**: Command processing and response validation
+  - Command schema validation for all 4 WebSocket endpoints
+  - Defensive data validation patterns (v0.8.10 fix validation)
+  - Error response structure and handling
+  - Data serialization for JSON transmission
 
-### ⚠️ Expected Failures (2/21)
-**These failures are normal without Home Assistant environment:**
-- Graph service import test (requires HA modules)
-- WebSocket API import test (requires HA components)
+**Overall Result: 50/50 passed = 🎉 All tests passing!**
 
-**Overall Result: 19/21 passed = ✅ All critical tests passing**
-
-### 🎯 v0.6.0 Feature Verification
-All major v0.6.0 features verified:
-- ✅ Configurable depth (1-5 levels, default 3)
-- ✅ Fixed conditional relationship semantics
-- ✅ Inline depth control in search bar
-- ✅ Proper reset button behavior (layout vs data)
-- ✅ Expanded canvas utilizing full viewport
-- ✅ Version consistency across all files
+### 🎯 v0.8.11 Feature Verification
+All major features verified through unit testing:
+- ✅ **Persistent Preferences**: localStorage-based preference management
+- ✅ **Defensive Error Handling**: "'NoneType' object is not iterable" fixes (v0.8.10)
+- ✅ **Graph Building Logic**: Comprehensive relationship detection
+- ✅ **WebSocket Command Processing**: All 4 API endpoints validated
+- ✅ **Data Structure Integrity**: Safe JSON serialization and transmission
 
 ## Archive Scripts
 
