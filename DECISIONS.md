@@ -283,15 +283,60 @@ if "graph_service" in hass.data[DOMAIN]:
 4. **User Feedback Loop**: Release experimental fix and gather detailed feedback
 5. **Iterative Improvement**: Use user logs to identify actual root cause if fix doesn't work
 
-## Current Status (v0.8.12)
+## Panel Registration Root Cause Resolution (v0.8.13)
+
+### Issue #11 - Root Cause Identified and Fixed ✅
+- **Problem**: Multiple users reported sidebar panel not appearing after installation
+- **Root Cause Discovered**: Integration had `"config_flow": false` which prevented Home Assistant from calling initialization code for users without YAML configuration
+- **Impact**: Most users experienced complete integration failure (not just panel issues)
+
+### Solution That Works ✅
+1. **Enable Config Flow**: Changed `"config_flow": true` in manifest.json
+2. **User-Friendly Setup**: Added rich config flow with clear feature descriptions and setup guidance
+3. **Standard HA Pattern**: Uses config entries for reliable initialization (the proper Home Assistant way)
+4. **Backward Compatibility**: YAML configurations automatically imported to config entries
+
+### Config Flow Best Practices ✅
+```python
+# User-friendly setup flow
+return self.async_show_form(
+    step_id="user",
+    data_schema=vol.Schema({}),  # No complex config needed
+    description_placeholders={
+        "description": (
+            "**Entity Visualizer** adds an interactive graph panel...\n\n"
+            "**What you'll get:**\n"
+            "• **Interactive Entity Graph** - Visualize entities and relationships\n"
+            "• **Smart Search** - Find any entity\n"
+            # ... detailed feature list
+            "*No configuration needed - just click Submit to install.*"
+        )
+    },
+)
+```
+
+### User Experience Improvements ✅
+- **Clear Setup Instructions**: Users guided through Settings → Integrations → Add Integration → Entity Visualizer
+- **Rich Feature Description**: Detailed explanation of what they get and how to use it
+- **Success Confirmation**: Clear messages confirming successful setup
+- **Enhanced Diagnostics**: Comprehensive logging for troubleshooting
+
+### Technical Implementation ✅
+- **Dual Setup Support**: Handles both config entries and YAML imports
+- **File Validation**: Checks for missing frontend files before panel registration
+- **Enhanced Error Handling**: Better diagnostics and cleanup on failures
+- **Setup Confirmation**: Visual indicators (✅/❌) in logs for each step
+
+## Current Status (v0.8.13)
 
 - ✅ **Testing**: Mock-based unit testing (50/50 tests passing) + syntax validation + manual HA testing
 - ✅ **Bug Fixes**: All major architectural issues resolved (bidirectional relationships, auto-setup, graph data corruption)
 - ✅ **Critical Safety**: Boot failure and data corruption issues resolved with comprehensive error handling
-- ✅ **User Experience**: Installation automatic with safe initialization patterns, no visualization crashes
-- 🔧 **Panel Registration**: Experimental fix applied for sidebar not appearing (Issue #11 - awaiting user feedback)
+- ✅ **User Experience**: Standard config flow setup with clear instructions, reliable panel registration
+- ✅ **Panel Registration**: Root cause identified and fixed - config flow enables proper initialization (Issue #11 resolved)
 - ✅ **Architecture**: Universal relationship checking + safe initialization + defensive data validation patterns
 - ✅ **Error Handling**: Comprehensive try-catch blocks and data validation throughout service layer
+- ✅ **Modern Integration Pattern**: Proper config flow implementation following Home Assistant best practices
 
 ## Future Considerations
 
