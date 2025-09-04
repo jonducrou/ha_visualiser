@@ -2,6 +2,30 @@
 
 All notable changes to the Home Assistant Entity Visualizer will be documented in this file.
 
+## [0.8.13] - 2025-09-04
+
+### Major Fix
+- **🎛️ Config Flow Enabled**: Integration can now be added via Settings → Integrations → Add Integration → Entity Visualizer
+- **🔧 Root Cause Solution**: Fixed the core issue where `config_flow: false` prevented integration initialization for most users
+- **📱 User-Friendly Setup**: Clear, helpful messages guide users through the setup process
+
+### Enhanced User Experience
+- **✨ Setup Description**: Rich description in config flow explains what users get and how to use it
+- **🎯 Clear Instructions**: Step-by-step guidance from installation to accessing the panel
+- **🔄 Backward Compatibility**: Existing YAML configurations still supported via automatic import
+
+### Improved Diagnostics
+- **📊 Enhanced Logging**: Comprehensive diagnostics to help troubleshoot any remaining issues
+- **🔍 File Verification**: Automatic checks for missing frontend files with clear error messages
+- **✅ Setup Confirmation**: Clear success messages with emojis to confirm successful installation
+- **🧹 Better Cleanup**: Improved error handling and cleanup on failed installations
+
+### Technical
+- **Config Flow Implementation**: Added user-friendly `config_flow.py` with detailed setup messaging
+- **Dual Setup Support**: Handles both UI config entries and YAML imports seamlessly
+- **Frontend File Validation**: Checks for missing www directory and JS files before panel registration
+- **Diagnostic Logging**: All setup steps now logged with clear success/failure indicators
+
 ## [0.8.12] - 2025-09-03
 
 ### Attempted Fix

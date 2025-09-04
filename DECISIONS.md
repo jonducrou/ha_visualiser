@@ -246,13 +246,50 @@ from custom_components.ha_visualiser.graph_service import GraphService
 - **Development Speed**: Fast iteration without HA environment setup
 - **Documentation**: Tests serve as executable specifications
 
-## Current Status (v0.8.11)
+## Panel Registration Debugging (v0.8.12)
+
+### Issue Investigation ❓→🔧
+- **Problem**: Multiple users reporting sidebar panel not appearing after installation (Issue #11)
+- **Challenge**: Unable to reproduce issue locally - working correctly in development environment
+- **Approach**: Code analysis to identify potential edge cases in panel registration
+
+### Suspected Root Cause ❓
+Based on code analysis, identified potential issue with early return logic:
+1. `async_setup()` has early return if `DOMAIN in hass.data` (line 35-37)
+2. `_setup_integration()` has early return if `"graph_service" in hass.data[DOMAIN]` (line 61-63)
+3. **Edge Case**: If integration partially initializes (sets hass.data but panel registration fails), subsequent restarts would skip panel registration entirely
+
+### Experimental Fix Applied 🔧
+```python
+# Before: Early return skipped panel registration
+if "graph_service" in hass.data[DOMAIN]:
+    return True
+
+# After: Always ensure panel is registered
+if "graph_service" in hass.data[DOMAIN]:
+    return await _ensure_panel_registered(hass)
+```
+
+### Key Changes ✅
+- Added `_ensure_panel_registered()` function for reliable panel registration
+- Modified setup logic to always verify panel registration even when services exist
+- Enhanced error handling and logging around panel registration
+- Refactored to eliminate code duplication
+
+### Debugging Strategy for Non-Reproducible Issues ✅
+1. **Code Analysis**: Identify potential edge cases based on user reports
+2. **Defensive Programming**: Make code more robust against edge cases
+3. **Enhanced Logging**: Add detailed logging to help identify issues
+4. **User Feedback Loop**: Release experimental fix and gather detailed feedback
+5. **Iterative Improvement**: Use user logs to identify actual root cause if fix doesn't work
+
+## Current Status (v0.8.12)
 
 - ✅ **Testing**: Mock-based unit testing (50/50 tests passing) + syntax validation + manual HA testing
 - ✅ **Bug Fixes**: All major architectural issues resolved (bidirectional relationships, auto-setup, graph data corruption)
 - ✅ **Critical Safety**: Boot failure and data corruption issues resolved with comprehensive error handling
 - ✅ **User Experience**: Installation automatic with safe initialization patterns, no visualization crashes
-- ✅ **GitHub Issues**: All open issues (#5, #8, #9, #10) resolved and closed  
+- 🔧 **Panel Registration**: Experimental fix applied for sidebar not appearing (Issue #11 - awaiting user feedback)
 - ✅ **Architecture**: Universal relationship checking + safe initialization + defensive data validation patterns
 - ✅ **Error Handling**: Comprehensive try-catch blocks and data validation throughout service layer
 

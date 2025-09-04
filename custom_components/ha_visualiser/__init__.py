@@ -19,7 +19,7 @@ from .websocket_api import async_register_websocket_handlers
 _LOGGER = logging.getLogger(__name__)
 
 # Add a module-level log to confirm import
-_LOGGER.info("ha_visualiser __init__.py module loaded")
+_LOGGER.info("ha_visualiser __init__.py module loaded - v0.8.13 with config flow enabled")
 
 PLATFORMS: list[str] = []
 
@@ -28,48 +28,72 @@ CONFIG_SCHEMA = vol.Schema({DOMAIN: cv.empty_config_schema}, extra=vol.ALLOW_EXT
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up the Home Assistant Entity Visualizer integration."""
-    _LOGGER.info("Setting up Home Assistant Entity Visualizer integration")
+    """Set up the Home Assistant Entity Visualizer integration via YAML."""
+    _LOGGER.info("Setting up Entity Visualizer integration via YAML")
     
-    # Check if already initialized to prevent conflicts
-    if DOMAIN in hass.data:
-        _LOGGER.debug("Integration already initialized, skipping setup")
+    # Check if already initialized via config entry
+    if DOMAIN in hass.data and "graph_service" in hass.data[DOMAIN]:
+        _LOGGER.debug("Integration already initialized via config entry, skipping YAML setup")
         return True
     
-    # For config_flow: false integrations, always initialize when files are present
-    # This provides automatic setup without requiring manual configuration
+    # Handle YAML configuration
     if DOMAIN not in config:
-        _LOGGER.debug("No YAML configuration found, initializing automatically for sidebar setup")
-        # Create minimal config to proceed with initialization
-        config = {DOMAIN: {}}
+        _LOGGER.debug("No YAML configuration found, but config_flow is now enabled")
+        _LOGGER.info("Entity Visualizer: Please add this integration via Settings → Integrations → Add Integration → Entity Visualizer")
+        return True
+    
+    _LOGGER.info("Entity Visualizer: Setting up from YAML configuration")
     
     try:
-        return await _setup_integration(hass, config)
+        # Import YAML config to config entry for unified handling
+        hass.async_create_task(
+            hass.config_entries.flow.async_init(
+                DOMAIN,
+                context={"source": "import"},
+                data=config.get(DOMAIN, {}),
+            )
+        )
+        return True
     except Exception as e:
-        _LOGGER.error("Failed to setup integration: %s", e, exc_info=True)
-        # Clean up on failure to prevent partial initialization
-        if DOMAIN in hass.data:
-            hass.data.pop(DOMAIN)
+        _LOGGER.error("Failed to import YAML configuration to config entry: %s", e, exc_info=True)
         return False
 
 
 async def _ensure_panel_registered(hass: HomeAssistant) -> bool:
     """Ensure the panel is registered, used for retry scenarios."""
-    _LOGGER.debug("Ensuring panel registration")
+    _LOGGER.debug("Entity Visualizer: Ensuring panel registration")
+    
+    # Check if www directory exists
+    www_path = hass.config.path("custom_components/ha_visualiser/www")
+    try:
+        import os
+        if not os.path.exists(www_path):
+            _LOGGER.error("Entity Visualizer: www directory missing at %s", www_path)
+            return False
+        
+        js_file = os.path.join(www_path, "ha-visualiser-panel.js")
+        if not os.path.exists(js_file):
+            _LOGGER.error("Entity Visualizer: Frontend JS file missing at %s", js_file)
+            return False
+        
+        _LOGGER.debug("Entity Visualizer: Frontend files verified at %s", www_path)
+    except Exception as e:
+        _LOGGER.error("Entity Visualizer: Error checking frontend files: %s", e)
+        return False
     
     try:
         # Register static paths if not already registered
         await hass.http.async_register_static_paths([
             StaticPathConfig(
                 "/api/ha_visualiser/static",
-                hass.config.path("custom_components/ha_visualiser/www"),
+                www_path,
                 False
             )
         ])
-        _LOGGER.debug("Static paths registered successfully")
+        _LOGGER.debug("Entity Visualizer: Static paths registered successfully")
     except Exception as e:
         # Static paths might already be registered, this is not critical
-        _LOGGER.debug("Static paths registration skipped or failed: %s", e)
+        _LOGGER.debug("Entity Visualizer: Static paths registration skipped or failed (likely already registered): %s", e)
     
     # Register the panel with defensive error handling
     try:
@@ -83,66 +107,94 @@ async def _ensure_panel_registered(hass: HomeAssistant) -> bool:
             config={},
             require_admin=False,
         )
-        _LOGGER.info("Panel registered successfully")
+        _LOGGER.info("Entity Visualizer: ✅ Panel registered successfully - look for 'Entity Visualizer' in your sidebar!")
         return True
     except ValueError as e:
         if "Overwriting panel" in str(e):
-            _LOGGER.debug("Panel already registered, skipping registration")
+            _LOGGER.debug("Entity Visualizer: Panel already registered, skipping registration")
             return True
         else:
-            _LOGGER.error("Failed to register panel: %s", e)
+            _LOGGER.error("Entity Visualizer: ❌ Failed to register panel (ValueError): %s", e)
             return False
     except Exception as e:
-        _LOGGER.error("Unexpected error during panel registration: %s", e)
+        _LOGGER.error("Entity Visualizer: ❌ Unexpected error during panel registration: %s", e, exc_info=True)
         return False
 
 
 async def _setup_integration(hass: HomeAssistant, config: ConfigType) -> bool:
     """Shared setup logic for both YAML and config entry setup."""
+    _LOGGER.debug("Entity Visualizer: Starting integration setup")
     hass.data.setdefault(DOMAIN, {})
     
     # Check if already set up to avoid duplicates
     if "graph_service" in hass.data[DOMAIN]:
-        _LOGGER.debug("Integration services already initialized, checking panel registration")
+        _LOGGER.debug("Entity Visualizer: Services already initialized, verifying panel registration")
         # Even if services are initialized, we need to ensure panel is registered
         # This handles cases where panel registration failed on previous attempts
-        return await _ensure_panel_registered(hass)
+        panel_result = await _ensure_panel_registered(hass)
+        if panel_result:
+            _LOGGER.info("Entity Visualizer: Setup completed (services existed, panel verified)")
+        return panel_result
     
-    # Initialize the graph service
-    graph_service = GraphService(hass)
-    hass.data[DOMAIN]["graph_service"] = graph_service
-    
-    # Register websocket API handlers
-    async_register_websocket_handlers(hass)
-    
-    # Register the frontend panel
-    panel_result = await _ensure_panel_registered(hass)
-    if not panel_result:
-        _LOGGER.error("Failed to register panel during initial setup")
+    try:
+        # Initialize the graph service
+        _LOGGER.debug("Entity Visualizer: Initializing graph service")
+        graph_service = GraphService(hass)
+        hass.data[DOMAIN]["graph_service"] = graph_service
+        _LOGGER.debug("Entity Visualizer: Graph service initialized successfully")
+        
+        # Register websocket API handlers
+        _LOGGER.debug("Entity Visualizer: Registering websocket handlers")
+        async_register_websocket_handlers(hass)
+        _LOGGER.debug("Entity Visualizer: Websocket handlers registered successfully")
+        
+        # Register the frontend panel
+        _LOGGER.debug("Entity Visualizer: Attempting panel registration")
+        panel_result = await _ensure_panel_registered(hass)
+        if not panel_result:
+            _LOGGER.error("Entity Visualizer: ❌ Failed to register panel during initial setup")
+            # Clean up on panel registration failure
+            if DOMAIN in hass.data and "graph_service" in hass.data[DOMAIN]:
+                hass.data[DOMAIN].pop("graph_service")
+            return False
+        
+        _LOGGER.info("Entity Visualizer: ✅ Integration setup completed successfully")
+        return True
+        
+    except Exception as e:
+        _LOGGER.error("Entity Visualizer: ❌ Error during integration setup: %s", e, exc_info=True)
+        # Clean up on any failure
+        if DOMAIN in hass.data and "graph_service" in hass.data[DOMAIN]:
+            hass.data[DOMAIN].pop("graph_service")
         return False
-    
-    _LOGGER.info("Home Assistant Entity Visualizer integration setup completed")
-    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Home Assistant Entity Visualizer from a config entry."""
-    _LOGGER.info("Setting up Entity Visualizer from config entry")
+    _LOGGER.info("Entity Visualizer: Setting up from config entry (ID: %s)", entry.entry_id)
     
     # Check if already initialized via YAML setup to prevent conflicts
     if DOMAIN in hass.data and "graph_service" in hass.data[DOMAIN]:
-        _LOGGER.debug("Integration already initialized via YAML, skipping config entry setup")
-        return True
+        _LOGGER.debug("Integration already initialized via YAML, merging with config entry")
+        # Ensure panel registration even if services exist
+        panel_result = await _ensure_panel_registered(hass)
+        if panel_result:
+            _LOGGER.info("Entity Visualizer: Config entry setup completed (panel verified)")
+        return panel_result
     
     try:
+        _LOGGER.debug("Entity Visualizer: Starting config entry initialization")
         result = await _setup_integration(hass, {})
         if result:
-            _LOGGER.info("Entity Visualizer loaded successfully via config entry")
+            _LOGGER.info("Entity Visualizer: Successfully loaded via config entry - panel should be available in sidebar")
+        else:
+            _LOGGER.error("Entity Visualizer: Config entry setup failed during _setup_integration")
         return result
     except Exception as e:
-        _LOGGER.error("Failed to setup integration from config entry: %s", e, exc_info=True)
-        # Clean up on failure
+        _LOGGER.error("Entity Visualizer: Failed to setup integration from config entry: %s", e, exc_info=True)
+        # Clean up on failure to prevent partial initialization
         if DOMAIN in hass.data:
+            _LOGGER.debug("Entity Visualizer: Cleaning up failed initialization data")
             hass.data.pop(DOMAIN)
         return False
 
