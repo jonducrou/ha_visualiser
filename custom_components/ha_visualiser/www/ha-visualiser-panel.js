@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.8.13: Config flow enabled - should install via Settings → Integrations');
+    console.log('HA Visualiser Panel v0.8.14: Mobile responsive search interface - fixed mobile usability issues');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
@@ -369,6 +369,113 @@ class HaVisualiserPanel extends HTMLElement {
           color: var(--error-color);
           text-align: center;
         }
+        
+        /* Mobile Responsive Design */
+        @media (max-width: 768px) {
+          .container {
+            padding: 12px;
+            height: calc(100vh - 24px);
+          }
+          
+          .search-section {
+            flex-direction: column;
+            gap: 12px;
+            padding: 12px;
+            margin-bottom: 16px;
+          }
+          
+          .search-container {
+            flex: 1;
+            max-width: none;
+            width: 100%;
+          }
+          
+          .search-input {
+            width: 100%;
+            font-size: 16px;
+            min-height: 44px;
+            height: 44px;
+            padding: 12px;
+            -webkit-appearance: none;
+          }
+          
+          .search-results {
+            left: 0;
+            right: 0;
+            width: 100%;
+            max-height: 250px;
+          }
+          
+          .search-result {
+            padding: 12px;
+            min-height: 44px;
+            align-items: center;
+          }
+          
+          .depth-control,
+          .filter-control,
+          .layout-control {
+            min-width: auto;
+            width: 100%;
+            justify-content: space-between;
+            margin-bottom: 8px;
+          }
+          
+          .depth-control:last-child,
+          .filter-control:last-child,
+          .layout-control:last-child {
+            margin-bottom: 0;
+          }
+          
+          .depth-control select,
+          .layout-control select {
+            min-width: 120px;
+            flex-shrink: 0;
+          }
+          
+          .graph-section {
+            min-height: 500px;
+          }
+          
+          .graph-controls {
+            top: 12px;
+            right: 12px;
+            flex-direction: column;
+            gap: 6px;
+          }
+          
+          .control-button {
+            padding: 10px 16px;
+            font-size: 14px;
+            min-height: 40px;
+          }
+          
+          .graph-info {
+            bottom: 12px;
+            left: 12px;
+            right: 12px;
+            text-align: center;
+          }
+        }
+        
+        /* Tablet breakpoint */
+        @media (max-width: 1024px) and (min-width: 769px) {
+          .search-section {
+            flex-wrap: wrap;
+            gap: 12px;
+          }
+          
+          .search-container {
+            flex: 1;
+            min-width: 300px;
+          }
+          
+          .depth-control,
+          .filter-control,
+          .layout-control {
+            flex-shrink: 0;
+          }
+        }
       </style>
       
       <div class="container">
@@ -451,8 +558,23 @@ class HaVisualiserPanel extends HTMLElement {
       }, 300);
     });
     
+    // Prevent zoom on iOS when focusing search input
+    searchInput.addEventListener('touchstart', (e) => {
+      // Ensure the viewport meta tag is properly set for mobile
+      if (window.innerWidth < 768) {
+        searchInput.style.fontSize = '16px'; // Prevents zoom on iOS
+      }
+    });
+    
     // Hide search results when clicking outside
     document.addEventListener('click', (e) => {
+      if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+        searchResults.style.display = 'none';
+      }
+    });
+    
+    // Also handle touch events for mobile
+    document.addEventListener('touchend', (e) => {
       if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
         searchResults.style.display = 'none';
       }
