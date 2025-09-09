@@ -128,11 +128,12 @@ class HaVisualiserPanel extends HTMLElement {
           align-items: flex-start;
           gap: 16px;
           min-height: 56px;
+          flex-wrap: wrap;
         }
         
         .search-container {
-          flex: 0 1 70%;
-          max-width: 400px;
+          flex: 1 1 300px;
+          max-width: 500px;
           position: relative;
           display: flex;
           flex-direction: column;
@@ -370,110 +371,133 @@ class HaVisualiserPanel extends HTMLElement {
           text-align: center;
         }
         
-        /* Mobile Responsive Design */
+        /* Mobile Responsive Design - Higher specificity */
         @media (max-width: 768px) {
-          .container {
-            padding: 12px;
-            height: calc(100vh - 24px);
+          ha-visualiser-panel .container {
+            padding: 12px !important;
+            height: calc(100vh - 24px) !important;
           }
           
-          .search-section {
-            flex-direction: column;
-            gap: 12px;
-            padding: 12px;
-            margin-bottom: 16px;
+          ha-visualiser-panel .search-section {
+            flex-direction: column !important;
+            gap: 12px !important;
+            padding: 12px !important;
+            margin-bottom: 16px !important;
           }
           
-          .search-container {
-            flex: 1;
-            max-width: none;
-            width: 100%;
+          ha-visualiser-panel .search-container {
+            flex: 1 !important;
+            max-width: none !important;
+            width: 100% !important;
           }
           
-          .search-input {
-            width: 100%;
-            font-size: 16px;
-            min-height: 44px;
-            height: 44px;
-            padding: 12px;
-            -webkit-appearance: none;
+          ha-visualiser-panel .search-input {
+            width: 100% !important;
+            font-size: 16px !important;
+            min-height: 44px !important;
+            height: 44px !important;
+            padding: 12px !important;
+            -webkit-appearance: none !important;
+            box-sizing: border-box !important;
           }
           
-          .search-results {
-            left: 0;
-            right: 0;
-            width: 100%;
-            max-height: 250px;
+          ha-visualiser-panel .search-results {
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            max-height: 250px !important;
           }
           
-          .search-result {
-            padding: 12px;
-            min-height: 44px;
-            align-items: center;
+          ha-visualiser-panel .search-result {
+            padding: 12px !important;
+            min-height: 44px !important;
+            align-items: center !important;
           }
           
-          .depth-control,
-          .filter-control,
-          .layout-control {
-            min-width: auto;
-            width: 100%;
-            justify-content: space-between;
-            margin-bottom: 8px;
+          ha-visualiser-panel .depth-control,
+          ha-visualiser-panel .filter-control,
+          ha-visualiser-panel .layout-control {
+            min-width: auto !important;
+            width: 100% !important;
+            justify-content: space-between !important;
+            margin-bottom: 8px !important;
           }
           
-          .depth-control:last-child,
-          .filter-control:last-child,
-          .layout-control:last-child {
-            margin-bottom: 0;
+          ha-visualiser-panel .depth-control:last-child,
+          ha-visualiser-panel .filter-control:last-child,
+          ha-visualiser-panel .layout-control:last-child {
+            margin-bottom: 0 !important;
           }
           
-          .depth-control select,
-          .layout-control select {
-            min-width: 120px;
-            flex-shrink: 0;
+          ha-visualiser-panel .depth-control select,
+          ha-visualiser-panel .layout-control select {
+            min-width: 120px !important;
+            flex-shrink: 0 !important;
           }
           
-          .graph-section {
-            min-height: 500px;
+          ha-visualiser-panel .graph-section {
+            min-height: 500px !important;
           }
           
-          .graph-controls {
-            top: 12px;
-            right: 12px;
-            flex-direction: column;
-            gap: 6px;
+          ha-visualiser-panel .graph-controls {
+            top: 12px !important;
+            right: 12px !important;
+            flex-direction: column !important;
+            gap: 6px !important;
           }
           
-          .control-button {
-            padding: 10px 16px;
-            font-size: 14px;
-            min-height: 40px;
+          ha-visualiser-panel .control-button {
+            padding: 10px 16px !important;
+            font-size: 14px !important;
+            min-height: 40px !important;
           }
           
-          .graph-info {
-            bottom: 12px;
-            left: 12px;
-            right: 12px;
-            text-align: center;
+          ha-visualiser-panel .graph-info {
+            bottom: 12px !important;
+            left: 12px !important;
+            right: 12px !important;
+            text-align: center !important;
           }
         }
         
-        /* Tablet breakpoint */
+        /* Tablet breakpoint - Better desktop compatibility */
         @media (max-width: 1024px) and (min-width: 769px) {
-          .search-section {
-            flex-wrap: wrap;
-            gap: 12px;
+          ha-visualiser-panel .search-section {
+            flex-wrap: wrap !important;
+            gap: 16px !important;
           }
           
-          .search-container {
-            flex: 1;
-            min-width: 300px;
+          ha-visualiser-panel .search-container {
+            flex: 1 1 400px !important;
+            min-width: 300px !important;
+            max-width: 500px !important;
           }
           
-          .depth-control,
-          .filter-control,
-          .layout-control {
-            flex-shrink: 0;
+          ha-visualiser-panel .depth-control,
+          ha-visualiser-panel .filter-control,
+          ha-visualiser-panel .layout-control {
+            flex-shrink: 0 !important;
+            min-width: auto !important;
+          }
+        }
+        
+        /* Desktop improvements - ensure good layout on larger screens */
+        @media (min-width: 1025px) {
+          ha-visualiser-panel .search-section {
+            flex-wrap: wrap !important;
+            align-items: center !important;
+            gap: 16px !important;
+          }
+          
+          ha-visualiser-panel .search-container {
+            flex: 1 1 400px !important;
+            max-width: 500px !important;
+          }
+          
+          ha-visualiser-panel .depth-control,
+          ha-visualiser-panel .filter-control,
+          ha-visualiser-panel .layout-control {
+            flex-shrink: 0 !important;
           }
         }
       </style>
