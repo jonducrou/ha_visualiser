@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.8.14: Mobile responsive search interface - fixed mobile usability issues');
+    console.log('HA Visualiser Panel v0.8.15: Added iOS navigation controls - mobile users can now access sidebar and navigate back');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
@@ -371,11 +371,73 @@ class HaVisualiserPanel extends HTMLElement {
           text-align: center;
         }
         
+        /* Mobile Navigation Header */
+        .mobile-nav-header {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 56px;
+          background: var(--primary-color, #0369a1);
+          color: var(--text-primary-color, white);
+          z-index: 1000;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 16px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .nav-button {
+          background: none;
+          border: none;
+          color: inherit;
+          padding: 12px;
+          border-radius: 50%;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 44px;
+          min-height: 44px;
+          transition: background-color 0.2s;
+        }
+        
+        .nav-button:hover {
+          background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .nav-button:active {
+          background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .nav-button svg {
+          width: 24px;
+          height: 24px;
+        }
+        
+        .nav-title {
+          font-size: 18px;
+          font-weight: 500;
+          flex: 1;
+          text-align: center;
+          margin: 0 16px;
+        }
+        
+        .nav-spacer {
+          width: 68px; /* Same width as nav-button to balance layout */
+        }
+        
         /* Mobile Responsive Design - Higher specificity */
         @media (max-width: 768px) {
+          .mobile-nav-header {
+            display: flex !important;
+          }
+          
           ha-visualiser-panel .container {
             padding: 12px !important;
-            height: calc(100vh - 24px) !important;
+            height: calc(100vh - 80px) !important;
+            margin-top: 56px !important;
           }
           
           ha-visualiser-panel .search-section {
@@ -502,6 +564,17 @@ class HaVisualiserPanel extends HTMLElement {
         }
       </style>
       
+      <!-- Mobile Navigation Header -->
+      <div class="mobile-nav-header" id="mobileNavHeader">
+        <button class="nav-button back-button" id="backBtn" title="Go back">
+          <svg width="24" height="24" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z"/>
+          </svg>
+        </button>
+        <div class="nav-title">Entity Visualizer</div>
+        <div class="nav-spacer"></div>
+      </div>
+
       <div class="container">
         <div class="search-section">
           <div class="search-container">
@@ -554,6 +627,7 @@ class HaVisualiserPanel extends HTMLElement {
     `;
 
     this.setupSearchEventListeners();
+    this.setupMobileNavigation();
     
     // Load and apply saved preferences before setting up controls
     const preferences = this.loadUserPreferences();
@@ -641,6 +715,60 @@ class HaVisualiserPanel extends HTMLElement {
           this.selectEntity(this.currentEntityId);
         }
       });
+    }
+  }
+
+  setupMobileNavigation() {
+    const backBtn = this.querySelector('#backBtn');
+    
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        this.navigateBack();
+      });
+    }
+  }
+  
+  navigateBack() {
+    console.log('HA Visualiser: Attempting navigation back');
+    
+    // Method 1: Use browser history if available
+    if (window.history.length > 1) {
+      try {
+        window.history.back();
+        console.log('HA Visualiser: Used browser back navigation');
+        return;
+      } catch (error) {
+        console.warn('HA Visualiser: Browser back navigation failed:', error);
+      }
+    }
+    
+    // Method 2: Navigate to dashboard via Home Assistant
+    try {
+      if (this.hass) {
+        const navigateEvent = new CustomEvent('hass-action', {
+          bubbles: true,
+          composed: true,
+          detail: {
+            config: {
+              action: 'navigate',
+              navigation_path: '/dashboard'
+            }
+          }
+        });
+        this.dispatchEvent(navigateEvent);
+        console.log('HA Visualiser: Navigate event dispatched to dashboard');
+        return;
+      }
+    } catch (error) {
+      console.warn('HA Visualiser: HA navigation event failed:', error);
+    }
+    
+    // Method 3: Direct URL navigation fallback
+    try {
+      window.location.href = '/dashboard';
+      console.log('HA Visualiser: Direct URL navigation to dashboard');
+    } catch (error) {
+      console.error('HA Visualiser: All navigation methods failed:', error);
     }
   }
 
