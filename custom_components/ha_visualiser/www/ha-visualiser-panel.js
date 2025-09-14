@@ -429,7 +429,7 @@ class HaVisualiserPanel extends HTMLElement {
         }
         
         /* Mobile Responsive Design - Higher specificity */
-        @media (max-width: 768px) {
+        @media (max-width: 870px) {
           .mobile-nav-header {
             display: flex !important;
           }
