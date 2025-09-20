@@ -165,7 +165,8 @@ class HaVisualiserPanel extends HTMLElement {
           border: 1px solid var(--divider-color);
           border-radius: 4px;
           box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0,0,0,0.15));
-          z-index: 2;
+          z-index: 1001;
+          pointer-events: auto;
         }
         
         .search-result {
@@ -175,6 +176,8 @@ class HaVisualiserPanel extends HTMLElement {
           display: flex;
           justify-content: space-between;
           align-items: center;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
         }
         
         .search-result:hover {
@@ -468,12 +471,17 @@ class HaVisualiserPanel extends HTMLElement {
             right: 0 !important;
             width: 100% !important;
             max-height: 250px !important;
+            z-index: 1001 !important;
+            pointer-events: auto !important;
           }
           
           ha-visualiser-panel .search-result {
             padding: 12px !important;
             min-height: 44px !important;
             align-items: center !important;
+            touch-action: manipulation !important;
+            -webkit-tap-highlight-color: transparent !important;
+            pointer-events: auto !important;
           }
           
           ha-visualiser-panel .depth-control,
