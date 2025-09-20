@@ -843,13 +843,24 @@ class HaVisualiserPanel extends HTMLElement {
     
     searchResults.style.display = 'block';
     
-    // Add click handlers
+    // Add touch and click handlers for mobile compatibility
     searchResults.querySelectorAll('.search-result').forEach(result => {
-      result.addEventListener('click', () => {
+      const handleSelection = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const entityId = result.dataset.entityId;
         this.selectEntity(entityId);
         searchResults.style.display = 'none';
-      });
+      };
+
+      // Add both touch and click handlers
+      result.addEventListener('click', handleSelection, { passive: false });
+      result.addEventListener('touchend', handleSelection, { passive: false });
+
+      // Prevent touch scrolling on search results
+      result.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+      }, { passive: false });
     });
   }
 
