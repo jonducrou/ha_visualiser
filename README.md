@@ -80,14 +80,16 @@ A powerful Home Assistant custom integration that visualizes your smart home as 
 2. Add this repository to HACS as a custom repository
 3. Download "Home Assistant Entity Visualizer"
 4. Restart Home Assistant
-5. ✅ **"Entity Visualizer" appears automatically in your sidebar**
+5. Go to **Settings** → **Devices & Services** → **Add Integration**
+6. Search for "Entity Visualizer" and add it
+7. ✅ **"Entity Visualizer" now appears in your sidebar**
 
 ### **Manual Installation**
 1. Copy the `custom_components/ha_visualiser/` directory to your HA `custom_components/` folder
-2. Restart Home Assistant  
-3. ✅ **"Entity Visualizer" appears automatically in your sidebar**
-
-> **Note**: As of v0.8.8, the integration sets up automatically after file installation. No manual configuration through Settings > Integrations is required!
+2. Restart Home Assistant
+3. Go to **Settings** → **Devices & Services** → **Add Integration**
+4. Search for "Entity Visualizer" and add it
+5. ✅ **"Entity Visualizer" now appears in your sidebar**
 
 ## 📖 Usage
 
