@@ -2479,12 +2479,13 @@ class GraphService:
                     template_fields = [
                         "state",              # Direct state field for template entities
                         "value_template",
-                        "state_template", 
+                        "state_template",
                         "availability_template",
                         "icon_template",
-                        "picture_template"
+                        "picture_template",
+                        "options"             # Template select options list
                     ]
-                    
+
                     for field in template_fields:
                         template_str = template_data.get(field, "")
                         if isinstance(template_str, str) and template_str:
@@ -2509,7 +2510,7 @@ class GraphService:
                                         _LOGGER.debug(f"Found template dependency: {entity_id} depends on {referenced_entity}")
                                     related.append((referenced_entity, "template_depends"))
                             
-                            # IMPORTANT: Also check if entity_id might be this template entity 
+                            # IMPORTANT: Also check if entity_id might be this template entity
                             # even if generated ID doesn't match exactly
                             if (template_str and entity_id.startswith(f"{template_type}.") and
                                 template_name.lower().replace(' ', '_') in entity_id.lower()):
@@ -2517,7 +2518,23 @@ class GraphService:
                                     if is_template_entity:
                                         _LOGGER.debug(f"Template dependency fuzzy match: {entity_id} depends on {referenced_entity}")
                                     related.append((referenced_entity, "template_depends"))
-                                    
+
+                    # Handle select_option actions (can be dict or list of actions)
+                    select_option = template_data.get("select_option")
+                    if select_option:
+                        # Convert to string to search for entity references
+                        select_option_str = str(select_option)
+                        referenced_entities = self._extract_entities_from_template_string_advanced(select_option_str)
+
+                        if entity_id == template_entity_id or (
+                            entity_id.startswith(f"{template_type}.") and
+                            template_name.lower().replace(' ', '_') in entity_id.lower()
+                        ):
+                            for referenced_entity in referenced_entities:
+                                if is_template_entity:
+                                    _LOGGER.debug(f"Found select_option dependency: {entity_id} depends on {referenced_entity}")
+                                related.append((referenced_entity, "template_depends"))
+
         except Exception as e:
             _LOGGER.debug(f"Error finding template config relationships: {e}")
         

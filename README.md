@@ -192,9 +192,14 @@ Please use the [GitHub Issues](https://github.com/jonducrou/ha_visualiser/issues
 
 ## 📊 Project Status
 
-This project is actively maintained and production-ready. Current version: **0.8.10**
+This project is actively maintained and production-ready. Current version: **0.8.17**
 
 ### Major Recent Updates
+
+#### **v0.8.17 - Template Select Support** ✨
+- **🔧 Template Select Fix**: Added support for `options` field in template select entities
+- **🔗 Enhanced Relationships**: Template select helpers now properly show entity dependencies
+- **📋 Select Action Support**: Detects entity references in select_option actions
 
 #### **v0.8.10 - "No visualisations" Error Fix** 🐛
 - **🔧 Graph Loading Fix**: Fixed critical "'NoneType' object is not iterable" error preventing visualization
