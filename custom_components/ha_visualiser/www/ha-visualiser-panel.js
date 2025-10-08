@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.8.15: Added iOS navigation controls - mobile users can now access sidebar and navigate back');
+    console.log('HA Visualiser Panel v0.8.18: Template compiler now handles all template types (helpers, automations, scripts)');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded

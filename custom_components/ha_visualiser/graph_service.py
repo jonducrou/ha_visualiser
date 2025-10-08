@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry, entity_registry, area_registry, label_registry
+from homeassistant.helpers.template import Template
 from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE
 
 _LOGGER = logging.getLogger(__name__)
@@ -2088,8 +2089,8 @@ class GraphService:
         
         # Handle different condition formats
         if isinstance(conditions, str):
-            # Template shorthand condition
-            entities.update(self._extract_entities_from_template_string_advanced(conditions))
+            # Template shorthand condition - use HA's template compiler
+            entities.update(self._extract_template_entities_using_ha(conditions))
             _LOGGER.debug(f"Found entities in template condition: {entities}")
         elif isinstance(conditions, dict):
             # Single condition object
@@ -2145,10 +2146,10 @@ class GraphService:
                 entities.add(specific_entity)
                 _LOGGER.debug(f"Found specific device entity: {specific_entity}")
         
-        # Template conditions
+        # Template conditions - use HA's template compiler
         value_template = condition.get("value_template")
         if value_template:
-            template_entities = self._extract_entities_from_template_string_advanced(value_template)
+            template_entities = self._extract_template_entities_using_ha(value_template)
             entities.update(template_entities)
             _LOGGER.debug(f"Found entities in value_template: {template_entities}")
         
@@ -2489,18 +2490,18 @@ class GraphService:
                     for field in template_fields:
                         template_str = template_data.get(field, "")
                         if isinstance(template_str, str) and template_str:
-                            # Parse template for entity references
-                            referenced_entities = self._extract_entities_from_template_string_advanced(template_str)
-                            
+                            # Use HA's built-in template parser to extract entity references
+                            referenced_entities = self._extract_template_entities_using_ha(template_str)
+
                             if is_relevant and is_template_entity:
                                 _LOGGER.debug(f"Found template field '{field}' with content: {template_str[:100]}...")
                                 _LOGGER.debug(f"Extracted entities from {field}: {referenced_entities}")
-                            
+
                             if entity_id in referenced_entities:
                                 if is_template_entity:
                                     _LOGGER.debug(f"Found template relationship: {template_entity_id} uses {entity_id}")
                                 related.append((template_entity_id, "template_uses"))
-                            
+
                             # Also check reverse - if this IS the template entity, show what it depends on
                             if entity_id == template_entity_id:
                                 if is_template_entity:
@@ -2509,7 +2510,7 @@ class GraphService:
                                     if is_template_entity:
                                         _LOGGER.debug(f"Found template dependency: {entity_id} depends on {referenced_entity}")
                                     related.append((referenced_entity, "template_depends"))
-                            
+
                             # IMPORTANT: Also check if entity_id might be this template entity
                             # even if generated ID doesn't match exactly
                             if (template_str and entity_id.startswith(f"{template_type}.") and
@@ -2524,7 +2525,7 @@ class GraphService:
                     if select_option:
                         # Convert to string to search for entity references
                         select_option_str = str(select_option)
-                        referenced_entities = self._extract_entities_from_template_string_advanced(select_option_str)
+                        referenced_entities = self._extract_template_entities_using_ha(select_option_str)
 
                         if entity_id == template_entity_id or (
                             entity_id.startswith(f"{template_type}.") and
@@ -2537,8 +2538,34 @@ class GraphService:
 
         except Exception as e:
             _LOGGER.debug(f"Error finding template config relationships: {e}")
-        
+
         return related
+
+    def _extract_template_entities_using_ha(self, template_str: str) -> Set[str]:
+        """Extract entity references from a template using HA's built-in template parser.
+
+        This method uses Home Assistant's Template.async_render_to_info() which is the same
+        method used by Developer Tools to show "Entities in template". This is more reliable
+        than regex parsing for complex templates.
+        """
+        if not isinstance(template_str, str) or not template_str.strip():
+            return set()
+
+        try:
+            # Create a Template object and render it to get dependency info
+            template = Template(template_str, self.hass)
+            render_info = template.async_render_to_info()
+
+            # The RenderInfo object contains a set of entity IDs that the template depends on
+            entities = render_info.entities if render_info.entities else set()
+
+            _LOGGER.debug(f"Template parser found {len(entities)} entities: {entities}")
+            return entities
+
+        except Exception as e:
+            # If template parsing fails, fall back to regex-based extraction
+            _LOGGER.debug(f"Template parsing failed, falling back to regex: {e}")
+            return self._extract_entities_from_template_string_advanced(template_str)
 
     async def _find_label_relationships(self, entity_entry) -> List[tuple[str, str]]:
         """Find label relationships for entity."""
@@ -3078,26 +3105,17 @@ class GraphService:
         return False
 
     def _entity_referenced_in_template_string(self, entity_id: str, template_str: str) -> bool:
-        """Check if entity is referenced in a Jinja2 template string."""
-        import re
-        
+        """Check if entity is referenced in a Jinja2 template string using HA's template compiler."""
         if not isinstance(template_str, str):
             return False
-        
-        # Common template patterns for entity references
-        patterns = [
-            rf"states\(['\"]?{re.escape(entity_id)}['\"]?\)",           # states('entity.id')
-            rf"state_attr\(['\"]?{re.escape(entity_id)}['\"]?,",        # state_attr('entity.id', 'attr')
-            rf"is_state\(['\"]?{re.escape(entity_id)}['\"]?,",          # is_state('entity.id', 'state')
-            rf"states\.{re.escape(entity_id.replace('.', r'\.'))}",     # states.entity.id
-        ]
-        
-        for pattern in patterns:
-            if re.search(pattern, template_str):
-                return True
-        
-        # Simple containment check as fallback
-        return entity_id in template_str
+
+        # Use HA's template compiler to get all referenced entities
+        try:
+            referenced_entities = self._extract_template_entities_using_ha(template_str)
+            return entity_id in referenced_entities
+        except Exception:
+            # If template parsing fails, fall back to simple containment check
+            return entity_id in template_str
 
     def _entity_belongs_to_device(self, entity_id: str, device_id: str) -> bool:
         """Check if an entity belongs to a specific device."""
