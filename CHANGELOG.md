@@ -2,6 +2,25 @@
 
 All notable changes to the Home Assistant Entity Visualizer will be documented in this file.
 
+## [0.8.18] - 2025-10-08
+
+### Major Improvement
+- **🔧 Template Compiler Integration**: Now uses Home Assistant's built-in template compiler for dependency detection
+- **✨ More Reliable**: Uses `Template.async_render_to_info()` - the same method Developer Tools uses
+- **📊 Better Coverage**: Handles complex templates with multi-line syntax, nested structures, all Jinja2 features
+
+### Enhanced Template Detection
+- **Template Select Entities**: Now correctly detects dependencies in template select helpers (Issue #15)
+- **All Template Types**: Improved detection for sensors, binary sensors, switches, buttons, numbers, text
+- **Automation Templates**: Better handling of template conditions in automations and scripts
+- **Complex Templates**: Reliably parses templates that regex patterns would miss
+
+### Technical
+- Added `_extract_template_entities_using_ha()` using `Template.async_render_to_info()`
+- Updated all template parsing to use HA's compiler instead of regex
+- Graceful fallback to regex parsing if template compilation fails
+- Template dependency detection now stays in sync with HA's capabilities
+
 ## [0.8.13] - 2025-09-04
 
 ### Major Fix

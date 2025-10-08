@@ -327,7 +327,46 @@ return self.async_show_form(
 - **Enhanced Error Handling**: Better diagnostics and cleanup on failures
 - **Setup Confirmation**: Visual indicators (✅/❌) in logs for each step
 
-## Current Status (v0.8.13)
+## Template Dependency Detection (v0.8.18)
+
+### Problem: Regex Template Parsing Limitations ❌
+- **Issue**: Complex templates with multi-line syntax, nested structures not reliably parsed by regex
+- **Example**: Template select entities (Issue #15) showed dependencies in Dev Tools but not in visualizer
+- **Root Cause**: Custom regex patterns can't handle all Jinja2 template variations
+
+### Solution: Use HA's Template Compiler ✅
+**Approach**: Use `Template.async_render_to_info()` - the exact method Developer Tools uses
+
+```python
+from homeassistant.helpers.template import Template
+
+def _extract_template_entities_using_ha(self, template_str: str) -> Set[str]:
+    template = Template(template_str, self.hass)
+    render_info = template.async_render_to_info()
+    return render_info.entities  # Set[str] of entity IDs
+```
+
+### Why This Works ✅
+1. **Same as Dev Tools**: Uses identical method to what users see in Developer Tools
+2. **HA Does Parsing**: Relies entirely on Home Assistant's template engine, not custom logic
+3. **Handles All Jinja2**: Works with multi-line, nested, complex templates automatically
+4. **Always In Sync**: Uses HA instance's parser, so it stays current with HA updates
+5. **Graceful Fallback**: Falls back to regex if template compilation fails
+
+### What's Now Covered ✅
+- Template helpers (select, sensor, binary_sensor, switch, button, number, text)
+- All template fields: `state`, `options`, `select_option`, `value_template`, etc.
+- Automation/script template conditions
+- Template reference checking throughout codebase
+
+### Implementation Details ✅
+- Updated `_find_template_config_relationships()` to use compiler
+- Updated `_extract_entities_from_conditions()` to use compiler
+- Updated `_extract_entities_from_condition_config()` to use compiler
+- Updated `_entity_referenced_in_template_string()` to use compiler
+- Kept `_extract_entities_from_template_string_advanced()` as fallback
+
+## Current Status (v0.8.18)
 
 - ✅ **Testing**: Mock-based unit testing (50/50 tests passing) + syntax validation + manual HA testing
 - ✅ **Bug Fixes**: All major architectural issues resolved (bidirectional relationships, auto-setup, graph data corruption)
@@ -337,6 +376,7 @@ return self.async_show_form(
 - ✅ **Architecture**: Universal relationship checking + safe initialization + defensive data validation patterns
 - ✅ **Error Handling**: Comprehensive try-catch blocks and data validation throughout service layer
 - ✅ **Modern Integration Pattern**: Proper config flow implementation following Home Assistant best practices
+- ✅ **Template Detection**: Uses HA's built-in template compiler for reliable dependency detection (Issue #15)
 
 ## Future Considerations
 
