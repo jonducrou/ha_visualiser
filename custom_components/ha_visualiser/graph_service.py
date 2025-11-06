@@ -2063,12 +2063,19 @@ class GraphService:
                     entities.add(device_node_id)
                     _LOGGER.debug(f"Found device trigger for device {device_id}, using device node: {device_node_id}")
                 
-            # Check area_id references and resolve to entities  
+            # Check area_id references and resolve to entities
             area_id = config.get("area_id")
             if area_id:
                 area_entities = self._get_entities_for_area(area_id)
                 entities.update(area_entities)
-                
+
+            # Check for template triggers - use HA's template compiler
+            value_template = config.get("value_template")
+            if value_template:
+                template_entities = self._extract_template_entities_using_ha(value_template)
+                entities.update(template_entities)
+                _LOGGER.debug(f"Found entities in trigger value_template: {template_entities}")
+
             # Recursively check nested configurations
             for value in config.values():
                 if isinstance(value, list):
@@ -2974,7 +2981,12 @@ class GraphService:
                     return True
                 if isinstance(service_data.get("entity_id"), list) and entity_id in service_data.get("entity_id", []):
                     return True
-                    
+
+            # Check for template triggers - use HA's template compiler
+            value_template = config.get("value_template")
+            if value_template and self._entity_referenced_in_template_string(entity_id, value_template):
+                return True
+
             # Recursively check nested configurations
             for value in config.values():
                 if isinstance(value, list):

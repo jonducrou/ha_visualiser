@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.8.18: Template compiler now handles all template types (helpers, automations, scripts)');
+    console.log('HA Visualiser Panel v0.8.19: Template triggers in automations now show entity dependencies (forward & reverse)');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded

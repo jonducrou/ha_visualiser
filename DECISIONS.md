@@ -327,7 +327,7 @@ return self.async_show_form(
 - **Enhanced Error Handling**: Better diagnostics and cleanup on failures
 - **Setup Confirmation**: Visual indicators (✅/❌) in logs for each step
 
-## Template Dependency Detection (v0.8.18)
+## Template Dependency Detection (v0.8.18-0.8.19)
 
 ### Problem: Regex Template Parsing Limitations ❌
 - **Issue**: Complex templates with multi-line syntax, nested structures not reliably parsed by regex
@@ -357,6 +357,7 @@ def _extract_template_entities_using_ha(self, template_str: str) -> Set[str]:
 - Template helpers (select, sensor, binary_sensor, switch, button, number, text)
 - All template fields: `state`, `options`, `select_option`, `value_template`, etc.
 - Automation/script template conditions
+- **NEW (v0.8.19)**: Automation template triggers with `value_template`
 - Template reference checking throughout codebase
 
 ### Implementation Details ✅
@@ -364,9 +365,33 @@ def _extract_template_entities_using_ha(self, template_str: str) -> Set[str]:
 - Updated `_extract_entities_from_conditions()` to use compiler
 - Updated `_extract_entities_from_condition_config()` to use compiler
 - Updated `_entity_referenced_in_template_string()` to use compiler
+- **NEW (v0.8.19)**: Updated `_extract_entities_from_config()` to handle template triggers
+- **NEW (v0.8.19)**: Updated `_entity_referenced_in_config()` for reverse template relationships
 - Kept `_extract_entities_from_template_string_advanced()` as fallback
 
-## Current Status (v0.8.18)
+### Missing Template Support Fixed (v0.8.19) ✅
+**Problem**: Template triggers in automations weren't showing entity dependencies
+- **Issue**: Automation template triggers (platform: template) with `value_template` not extracted
+- **Impact**: Forward relationships (automation → entity) missing
+- **Impact**: Reverse relationships (entity → automation) missing
+- **Root Cause**: `_extract_entities_from_config()` only checked direct entity_id, not templates
+- **Root Cause**: `_entity_referenced_in_config()` didn't check template fields for reverse relationships
+
+**Solution**: Added template compiler checks to both functions
+```python
+# In _extract_entities_from_config (forward relationships)
+value_template = config.get("value_template")
+if value_template:
+    template_entities = self._extract_template_entities_using_ha(value_template)
+    entities.update(template_entities)
+
+# In _entity_referenced_in_config (reverse relationships)
+value_template = config.get("value_template")
+if value_template and self._entity_referenced_in_template_string(entity_id, value_template):
+    return True
+```
+
+## Current Status (v0.8.19)
 
 - ✅ **Testing**: Mock-based unit testing (50/50 tests passing) + syntax validation + manual HA testing
 - ✅ **Bug Fixes**: All major architectural issues resolved (bidirectional relationships, auto-setup, graph data corruption)
@@ -377,6 +402,7 @@ def _extract_template_entities_using_ha(self, template_str: str) -> Set[str]:
 - ✅ **Error Handling**: Comprehensive try-catch blocks and data validation throughout service layer
 - ✅ **Modern Integration Pattern**: Proper config flow implementation following Home Assistant best practices
 - ✅ **Template Detection**: Uses HA's built-in template compiler for reliable dependency detection (Issue #15)
+- ✅ **Template Triggers**: Automation template triggers now show entity dependencies (forward & reverse relationships)
 
 ## Future Considerations
 
