@@ -182,20 +182,20 @@ class GraphService:
                 if domain in group_domains:
                     # Check if group-like entity has any member entities
                     member_entities = []
-                    
+
                     if domain == "group":
-                        member_entities = state.attributes.get("entity_id", [])
+                        member_entities = state.attributes.get("entity_id") or []
                     elif domain == "light":
-                        light_entities = state.attributes.get("entity_id", [])
-                        lights_attr = state.attributes.get("lights", [])
+                        light_entities = state.attributes.get("entity_id") or []
+                        lights_attr = state.attributes.get("lights") or []
                         member_entities = light_entities + lights_attr
                     elif domain in ["switch", "cover", "fan", "climate"]:
-                        entity_attr = state.attributes.get("entity_id", [])
-                        plural_attr = state.attributes.get(f"{domain}s", [])
+                        entity_attr = state.attributes.get("entity_id") or []
+                        plural_attr = state.attributes.get(f"{domain}s") or []
                         member_entities = entity_attr + plural_attr
                     elif domain == "media_player":
-                        media_entities = state.attributes.get("entity_id", [])
-                        group_members = state.attributes.get("group_members", [])
+                        media_entities = state.attributes.get("entity_id") or []
+                        group_members = state.attributes.get("group_members") or []
                         member_entities = media_entities + group_members
                     
                     # Only include if it's a real group with members or if it might be a group
@@ -1146,24 +1146,24 @@ class GraphService:
                 
                 # Traditional groups use 'entity_id' attribute
                 if entity_id.startswith("group."):
-                    member_entities = group_state.attributes.get("entity_id", [])
-                
+                    member_entities = group_state.attributes.get("entity_id") or []
+
                 # Light groups
                 elif entity_id.startswith("light."):
                     # Standard entity_id attribute
-                    light_entities = group_state.attributes.get("entity_id", [])
+                    light_entities = group_state.attributes.get("entity_id") or []
                     member_entities.extend(light_entities)
-                    
+
                     # Alternative attributes that group helpers might use
-                    lights_attr = group_state.attributes.get("lights", [])
+                    lights_attr = group_state.attributes.get("lights") or []
                     member_entities.extend(lights_attr)
-                    
+
                     # Some light groups might use different attributes
-                    group_members = group_state.attributes.get("group_members", [])
+                    group_members = group_state.attributes.get("group_members") or []
                     member_entities.extend(group_members)
-                    
+
                     # Light helper-specific attributes
-                    light_list = group_state.attributes.get("light_list", [])
+                    light_list = group_state.attributes.get("light_list") or []
                     member_entities.extend(light_list)
                     
                     # Debug logging for empty light groups
@@ -1180,13 +1180,13 @@ class GraphService:
                 
                 # Switch groups
                 elif entity_id.startswith("switch."):
-                    switch_entities = group_state.attributes.get("entity_id", [])
+                    switch_entities = group_state.attributes.get("entity_id") or []
                     member_entities.extend(switch_entities)
-                    switches_attr = group_state.attributes.get("switches", [])
+                    switches_attr = group_state.attributes.get("switches") or []
                     member_entities.extend(switches_attr)
-                    
+
                     # Additional switch group attributes
-                    group_members = group_state.attributes.get("group_members", [])
+                    group_members = group_state.attributes.get("group_members") or []
                     member_entities.extend(group_members)
                     
                     # Debug logging for empty switch groups
@@ -1202,28 +1202,28 @@ class GraphService:
                 
                 # Cover groups
                 elif entity_id.startswith("cover."):
-                    cover_entities = group_state.attributes.get("entity_id", [])
+                    cover_entities = group_state.attributes.get("entity_id") or []
                     member_entities.extend(cover_entities)
-                    covers_attr = group_state.attributes.get("covers", [])
+                    covers_attr = group_state.attributes.get("covers") or []
                     member_entities.extend(covers_attr)
-                
+
                 # Fan groups
                 elif entity_id.startswith("fan."):
-                    fan_entities = group_state.attributes.get("entity_id", [])
+                    fan_entities = group_state.attributes.get("entity_id") or []
                     member_entities.extend(fan_entities)
-                    fans_attr = group_state.attributes.get("fans", [])
+                    fans_attr = group_state.attributes.get("fans") or []
                     member_entities.extend(fans_attr)
-                
+
                 # Media player groups
                 elif entity_id.startswith("media_player."):
-                    media_entities = group_state.attributes.get("entity_id", [])
+                    media_entities = group_state.attributes.get("entity_id") or []
                     member_entities.extend(media_entities)
-                    players_attr = group_state.attributes.get("group_members", [])
+                    players_attr = group_state.attributes.get("group_members") or []
                     member_entities.extend(players_attr)
-                
+
                 # Climate groups
                 elif entity_id.startswith("climate."):
-                    climate_entities = group_state.attributes.get("entity_id", [])
+                    climate_entities = group_state.attributes.get("entity_id") or []
                     member_entities.extend(climate_entities)
                 
                 # Scene groups
@@ -2609,22 +2609,22 @@ class GraphService:
                 
                 # Get member entities based on group type
                 if entity_id.startswith("group."):
-                    member_entities = group_state.attributes.get("entity_id", [])
+                    member_entities = group_state.attributes.get("entity_id") or []
                 elif entity_id.startswith("light."):
                     # Standard entity_id attribute
-                    light_entities = group_state.attributes.get("entity_id", [])
+                    light_entities = group_state.attributes.get("entity_id") or []
                     member_entities.extend(light_entities)
-                    
+
                     # Alternative attributes that group helpers might use
-                    lights_attr = group_state.attributes.get("lights", [])
+                    lights_attr = group_state.attributes.get("lights") or []
                     member_entities.extend(lights_attr)
-                    
+
                     # Some light groups might use different attributes
-                    group_members = group_state.attributes.get("group_members", [])
+                    group_members = group_state.attributes.get("group_members") or []
                     member_entities.extend(group_members)
-                    
+
                     # Light helper-specific attributes
-                    light_list = group_state.attributes.get("light_list", [])
+                    light_list = group_state.attributes.get("light_list") or []
                     member_entities.extend(light_list)
                     
                     # Debug logging for empty light groups
@@ -2639,15 +2639,15 @@ class GraphService:
                                     _LOGGER.debug(f"Potential entity list found in attribute '{attr_name}': {attr_value}")
                                     member_entities.extend([item for item in attr_value if isinstance(item, str) and '.' in item])
                 elif entity_id.startswith("switch."):
-                    switch_entities = group_state.attributes.get("entity_id", [])
+                    switch_entities = group_state.attributes.get("entity_id") or []
                     member_entities.extend(switch_entities)
-                    switches_attr = group_state.attributes.get("switches", [])
+                    switches_attr = group_state.attributes.get("switches") or []
                     member_entities.extend(switches_attr)
-                    
+
                     # Additional switch group attributes
-                    group_members = group_state.attributes.get("group_members", [])
+                    group_members = group_state.attributes.get("group_members") or []
                     member_entities.extend(group_members)
-                    
+
                     # Debug logging for empty switch groups
                     if not member_entities:
                         all_attrs = group_state.attributes
@@ -2659,22 +2659,22 @@ class GraphService:
                                     _LOGGER.debug(f"Potential entity list found in attribute '{attr_name}': {attr_value}")
                                     member_entities.extend([item for item in attr_value if isinstance(item, str) and '.' in item])
                 elif entity_id.startswith("cover."):
-                    cover_entities = group_state.attributes.get("entity_id", [])
+                    cover_entities = group_state.attributes.get("entity_id") or []
                     member_entities.extend(cover_entities)
-                    covers_attr = group_state.attributes.get("covers", [])
+                    covers_attr = group_state.attributes.get("covers") or []
                     member_entities.extend(covers_attr)
                 elif entity_id.startswith("fan."):
-                    fan_entities = group_state.attributes.get("entity_id", [])
+                    fan_entities = group_state.attributes.get("entity_id") or []
                     member_entities.extend(fan_entities)
-                    fans_attr = group_state.attributes.get("fans", [])
+                    fans_attr = group_state.attributes.get("fans") or []
                     member_entities.extend(fans_attr)
                 elif entity_id.startswith("media_player."):
-                    media_entities = group_state.attributes.get("entity_id", [])
+                    media_entities = group_state.attributes.get("entity_id") or []
                     member_entities.extend(media_entities)
-                    players_attr = group_state.attributes.get("group_members", [])
+                    players_attr = group_state.attributes.get("group_members") or []
                     member_entities.extend(players_attr)
                 elif entity_id.startswith("climate."):
-                    climate_entities = group_state.attributes.get("entity_id", [])
+                    climate_entities = group_state.attributes.get("entity_id") or []
                     member_entities.extend(climate_entities)
                 
                 # Remove duplicates
@@ -2722,24 +2722,24 @@ class GraphService:
             
             # Traditional groups use 'entity_id' attribute
             if group_candidate_id.startswith("group."):
-                member_entities = group_state.attributes.get("entity_id", [])
-            
-            # Light groups use 'entity_id' attribute 
+                member_entities = group_state.attributes.get("entity_id") or []
+
+            # Light groups use 'entity_id' attribute
             elif group_candidate_id.startswith("light."):
                 # Standard entity_id attribute
-                light_entities = group_state.attributes.get("entity_id", [])
+                light_entities = group_state.attributes.get("entity_id") or []
                 member_entities.extend(light_entities)
-                
+
                 # Alternative attributes that group helpers might use
-                lights_attr = group_state.attributes.get("lights", [])
+                lights_attr = group_state.attributes.get("lights") or []
                 member_entities.extend(lights_attr)
-                
+
                 # Some light groups might use different attributes
-                group_members = group_state.attributes.get("group_members", [])
+                group_members = group_state.attributes.get("group_members") or []
                 member_entities.extend(group_members)
-                
+
                 # Light helper-specific attributes
-                light_list = group_state.attributes.get("light_list", [])
+                light_list = group_state.attributes.get("light_list") or []
                 member_entities.extend(light_list)
                 
                 # Debug for light groups specifically and check for unknown attributes
@@ -2763,15 +2763,15 @@ class GraphService:
             
             # Switch groups
             elif group_candidate_id.startswith("switch."):
-                switch_entities = group_state.attributes.get("entity_id", [])
+                switch_entities = group_state.attributes.get("entity_id") or []
                 member_entities.extend(switch_entities)
-                
+
                 # Some switch groups might use 'switches' attribute
-                switches_attr = group_state.attributes.get("switches", [])
+                switches_attr = group_state.attributes.get("switches") or []
                 member_entities.extend(switches_attr)
-                
+
                 # Additional switch group attributes
-                group_members = group_state.attributes.get("group_members", [])
+                group_members = group_state.attributes.get("group_members") or []
                 member_entities.extend(group_members)
                 
                 # Debug logging for empty switch groups in reverse lookup
@@ -2787,32 +2787,32 @@ class GraphService:
             
             # Cover groups
             elif group_candidate_id.startswith("cover."):
-                cover_entities = group_state.attributes.get("entity_id", [])
+                cover_entities = group_state.attributes.get("entity_id") or []
                 member_entities.extend(cover_entities)
-                
-                covers_attr = group_state.attributes.get("covers", [])
+
+                covers_attr = group_state.attributes.get("covers") or []
                 member_entities.extend(covers_attr)
-            
+
             # Fan groups
             elif group_candidate_id.startswith("fan."):
-                fan_entities = group_state.attributes.get("entity_id", [])
+                fan_entities = group_state.attributes.get("entity_id") or []
                 member_entities.extend(fan_entities)
-                
-                fans_attr = group_state.attributes.get("fans", [])
+
+                fans_attr = group_state.attributes.get("fans") or []
                 member_entities.extend(fans_attr)
-            
+
             # Media player groups
             elif group_candidate_id.startswith("media_player."):
-                media_entities = group_state.attributes.get("entity_id", [])
+                media_entities = group_state.attributes.get("entity_id") or []
                 member_entities.extend(media_entities)
-                
+
                 # Sonos and other systems might use different attributes
-                players_attr = group_state.attributes.get("group_members", [])
+                players_attr = group_state.attributes.get("group_members") or []
                 member_entities.extend(players_attr)
-            
+
             # Climate groups
             elif group_candidate_id.startswith("climate."):
-                climate_entities = group_state.attributes.get("entity_id", [])
+                climate_entities = group_state.attributes.get("entity_id") or []
                 member_entities.extend(climate_entities)
                 
             # Scene groups (reverse lookup)

@@ -391,7 +391,40 @@ if value_template and self._entity_referenced_in_template_string(entity_id, valu
     return True
 ```
 
-## Current Status (v0.8.19)
+## NoneType Iteration Error Fix (v0.8.20)
+
+### Problem: Null Attribute Values Causing Graph Failures ❌
+- **Issue**: "NoneType object is not iterable" error when building neighbourhood graphs (Issue #18)
+- **Root Cause**: `dict.get("key", [])` returns `None` when key exists but value is `None`, not the default `[]`
+- **Affected Code**: Multiple places in `_find_group_relationships()` called `.extend()` on potentially `None` values
+- **Impact**: Graph building failed completely for any entity, showing empty graph
+
+### Solution: Use `or []` Pattern ✅
+**Before** (fails when attribute is `None`):
+```python
+players_attr = group_state.attributes.get("group_members", [])
+member_entities.extend(players_attr)  # TypeError if players_attr is None
+```
+
+**After** (handles both missing and `None` values):
+```python
+players_attr = group_state.attributes.get("group_members") or []
+member_entities.extend(players_attr)  # Always safe
+```
+
+### Files Fixed ✅
+- `graph_service.py`: Updated ~50 occurrences of `.get("attr", [])` pattern to `.get("attr") or []`
+- Sections fixed:
+  - `search_entities()` - group member extraction
+  - `_find_group_relationships()` - all group type handlers (light, switch, cover, fan, media_player, climate)
+  - Reverse relationship detection in Part 2
+
+### Key Lesson ✅
+In Home Assistant, entity attributes can have explicit `None` values (e.g., `group_members: null`).
+The `.get(key, default)` pattern only returns `default` when key is missing, not when value is `None`.
+Always use `or []` to handle both cases safely when the result will be iterated.
+
+## Current Status (v0.8.20)
 
 - ✅ **Testing**: Mock-based unit testing (50/50 tests passing) + syntax validation + manual HA testing
 - ✅ **Bug Fixes**: All major architectural issues resolved (bidirectional relationships, auto-setup, graph data corruption)
@@ -403,6 +436,7 @@ if value_template and self._entity_referenced_in_template_string(entity_id, valu
 - ✅ **Modern Integration Pattern**: Proper config flow implementation following Home Assistant best practices
 - ✅ **Template Detection**: Uses HA's built-in template compiler for reliable dependency detection (Issue #15)
 - ✅ **Template Triggers**: Automation template triggers now show entity dependencies (forward & reverse relationships)
+- ✅ **Null Safety**: Fixed NoneType iteration errors when group attributes are null (Issue #18)
 
 ## Future Considerations
 

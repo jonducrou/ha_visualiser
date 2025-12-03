@@ -17,7 +17,7 @@ class HaVisualiserPanel extends HTMLElement {
   }
  
   connectedCallback() {
-    console.log('HA Visualiser Panel v0.8.19: Template triggers in automations now show entity dependencies (forward & reverse)');
+    console.log('HA Visualiser Panel v0.8.20: Fixed NoneType error when group attributes are null');
     console.log('HA Visualiser Panel: Loading enhanced vis.js version');
     
     // Load vis.js if not already loaded
